@@ -1,0 +1,11 @@
+import React from 'react';
+
+function Anime3D() {
+  return (
+    <div className="p-10 text-white">
+      <h1 className="text-2xl font-bold">Trang Hoạt Hình 3D</h1>
+    </div>
+  );
+}
+
+export default Anime3D; // BẮT BUỘC PHẢI CÓ DÒNG NÀY
