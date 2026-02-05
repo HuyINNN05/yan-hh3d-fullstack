@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: 127.0.0.1
--- Thời gian đã tạo: Th2 05, 2026 lúc 02:57 PM
+-- Thời gian đã tạo: Th2 05, 2026 lúc 03:20 PM
 -- Phiên bản máy phục vụ: 10.4.32-MariaDB
 -- Phiên bản PHP: 8.2.12
 
@@ -101,39 +101,40 @@ CREATE TABLE `movies` (
   `category_id` int(11) DEFAULT NULL,
   `status` varchar(50) DEFAULT NULL,
   `description` text DEFAULT NULL,
-  `views` int(11) DEFAULT 0
+  `views` int(11) DEFAULT 0,
+  `video_url` varchar(500) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Đang đổ dữ liệu cho bảng `movies`
 --
 
-INSERT INTO `movies` (`id`, `title`, `episode_display`, `quality`, `image`, `show_schedule`, `category_id`, `status`, `description`, `views`) VALUES
-(1, 'Già Thiên', '147/156 [4K]', '4K TM-VS', '/image/Dau-pha-thuong-khung.jpg', 'Thứ 2', 1, 'Đang chiếu', NULL, 0),
-(2, 'Thế Giới Hoàn Mỹ', '182/200', 'Full HD', '/image/Dau-pha-thuong-khung.jpg', 'Thứ 6', 6, 'Đang chiếu', NULL, 0),
-(3, 'Thần Ấn Vương Tọa', '125/150', '4K', '/image/Dau-pha-thuong-khung.jpg', 'Thứ 5', 7, 'Đang chiếu', NULL, 0),
-(4, 'Đấu Phá Thương Khung', '110/120', '4K TM', '/image/Dau-pha-thuong-khung.jpg', 'Chủ nhật', 6, 'Đang chiếu', NULL, 0),
-(5, 'Phàm Nhân Tu Tiên', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 7', 6, 'Đang chiếu', NULL, 0),
-(6, 'Tiên Nghịch', '50/75', '4K TM-VS', '/image/Tien-nghich.jpg', 'Thứ 2', 6, 'Đang chiếu', NULL, 0),
-(7, 'Vũ Canh Kỷ', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 4', 6, 'Đang chiếu', NULL, 0),
-(8, 'Đấu La Đại Lục', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 7', 6, 'Đang chiếu', NULL, 0),
-(9, 'Thôn Phệ Tinh Không', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 3', 6, 'Đang chiếu', NULL, 0),
-(10, 'Mộ Lục Đạo', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 5', 6, 'Đang chiếu', NULL, 0),
-(11, 'Bách Luyện Thành Thần', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 6', 6, 'Đang chiếu', NULL, 0),
-(12, 'Nghịch Thiên Chí Tôn', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 2', 6, 'Đang chiếu', NULL, 0),
-(13, 'Vạn Giới Độc Tôn', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 4', 6, 'Đang chiếu', NULL, 0),
-(14, 'Luyện Khí 10 vạn năm', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 3', 6, 'Đang chiếu', NULL, 0),
-(15, 'Tuyệt Thế Vũ Thần', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 5', 6, 'Đang chiếu', NULL, 0),
-(16, 'Linh Kiếm Tôn', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 6', 6, 'Đang chiếu', NULL, 0),
-(17, 'Thế Giới Võ Thần', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 3', 6, 'Đang chiếu', NULL, 0),
-(18, 'Vạn Cổ Thần Thoại', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 3', 6, 'Đang chiếu', NULL, 0),
-(19, 'Độc Bộ Tiêu Dao', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 2', 6, 'Đang chiếu', NULL, 0),
-(20, 'Thần Khống Thiên Hạ', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Chủ nhật', 6, 'Đang chiếu', NULL, 0),
-(21, 'Kiếm Đạo Độc Tôn', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 7', 6, 'Đang chiếu', NULL, 0),
-(22, 'Võ Thần Chúa Tể', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 6', 6, 'Đang chiếu', NULL, 0),
-(23, 'Tuyệt Thế Chiến Thần', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 5', 6, 'Đang chiếu', NULL, 0),
-(24, 'Trường Sinh Giới', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 4', 6, 'Đang chiếu', NULL, 0),
-(25, 'Tử Xuyên', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 3', 6, 'Đang chiếu', NULL, 0);
+INSERT INTO `movies` (`id`, `title`, `episode_display`, `quality`, `image`, `show_schedule`, `category_id`, `status`, `description`, `views`, `video_url`) VALUES
+(1, 'Già Thiên', '147/156 [4K]', '4K TM-VS', '/image/Dau-pha-thuong-khung.jpg', 'Thứ 2', 1, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(2, 'Thế Giới Hoàn Mỹ', '182/200', 'Full HD', '/image/Dau-pha-thuong-khung.jpg', 'Thứ 6', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(3, 'Thần Ấn Vương Tọa', '125/150', '4K', '/image/Dau-pha-thuong-khung.jpg', 'Thứ 5', 7, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(4, 'Đấu Phá Thương Khung', '110/120', '4K TM', '/image/Dau-pha-thuong-khung.jpg', 'Chủ nhật', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(5, 'Phàm Nhân Tu Tiên', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 7', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(6, 'Tiên Nghịch', '50/75', '4K TM-VS', '/image/Tien-nghich.jpg', 'Thứ 2', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(7, 'Vũ Canh Kỷ', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 4', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(8, 'Đấu La Đại Lục', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 7', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(9, 'Thôn Phệ Tinh Không', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 3', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(10, 'Mộ Lục Đạo', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 5', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(11, 'Bách Luyện Thành Thần', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 6', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(12, 'Nghịch Thiên Chí Tôn', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 2', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(13, 'Vạn Giới Độc Tôn', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 4', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(14, 'Luyện Khí 10 vạn năm', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 3', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(15, 'Tuyệt Thế Vũ Thần', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 5', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(16, 'Linh Kiếm Tôn', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 6', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(17, 'Thế Giới Võ Thần', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 3', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(18, 'Vạn Cổ Thần Thoại', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 3', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(19, 'Độc Bộ Tiêu Dao', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 2', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(20, 'Thần Khống Thiên Hạ', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Chủ nhật', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(21, 'Kiếm Đạo Độc Tôn', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 7', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(22, 'Võ Thần Chúa Tể', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 6', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(23, 'Tuyệt Thế Chiến Thần', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 5', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(24, 'Trường Sinh Giới', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 4', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM'),
+(25, 'Tử Xuyên', '80/100', '2K', '/image/Pham-nhan-tu-tien.jpg', 'Thứ 3', 6, 'Đang chiếu', NULL, 0, 'https://www.youtube.com/embed/watch?v=lSfZZIeMFOM');
 
 -- --------------------------------------------------------
 

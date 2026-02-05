@@ -28,8 +28,10 @@ app.get('/api/movies', (req, res) => {
 
 // --- ĐÂY LÀ PHẦN MỚI THÊM VÀO ---
 // 2. API lấy chi tiết 1 bộ phim theo ID (Dùng cho trang MoviesSingle)
+// API lấy chi tiết 1 bộ phim theo ID
 app.get('/api/movies/:id', (req, res) => {
     const movieId = req.params.id;
+    // Sử dụng SELECT * để lấy tất cả các cột bao gồm cả video_url mới thêm
     const sql = `
         SELECT movies.*, categories.name AS category_name 
         FROM movies 
@@ -40,7 +42,7 @@ app.get('/api/movies/:id', (req, res) => {
     db.query(sql, [movieId], (err, data) => {
         if (err) return res.status(500).json({ error: err.message });
         if (data.length === 0) return res.status(404).json({ message: "Không tìm thấy phim" });
-        return res.json(data[0]); // Trả về đối tượng phim duy nhất
+        return res.json(data[0]); 
     });
 });
 // --------------------------------
