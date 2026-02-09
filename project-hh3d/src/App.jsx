@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 
 // Import các thành phần cơ bản
 import Header from './compoment/Header'; 
@@ -8,11 +8,10 @@ import Home from './pages/Home';
 import Detail from './pages/Detail';
 import Login from './pages/login';
 import LoveMovie from './pages/LoveMovie';
-// Giữ nguyên tên file bị viết sai chính tả của bạn để tránh lỗi không tìm thấy file
 import WiewinghHistory from './pages/WiewinghHistory'; 
 import MovieSingle from './pages/Menu_home/MovieSingle';
 
-// Import chính xác từ thư mục Menu_home
+// Import từ thư mục Menu_home
 import Anime3D from './pages/Menu_home/Anime3D';
 import Anime2D from './pages/Menu_home/Anime2D';
 import Movie4K from './pages/Menu_home/Movie4K';
@@ -20,16 +19,29 @@ import Completed from './pages/Menu_home/Completed';
 import Ongoing from './pages/Menu_home/Ongoing';
 import Register from './pages/Register';
 
+// Import của phần admin
+import AdminMovies from './pages/Admin/AdminMovies';
+import AdminDashboard from './pages/Admin/Dashboard';
+import AddMovie from './pages/Admin/AddMovie';
+import AdminUsers from './pages/Admin/AdminUsers';
+import AddEpisode from './pages/Admin/AddEpisode';
+
 function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const location = useLocation();
+
+  // Kiểm tra xem trang hiện tại có phải là trang Admin hay không
+  const isAdminPage = location.pathname.startsWith('/admin');
 
   return (
     <div className="min-h-screen bg-[#0f0f0f]">
-      {/* Header chứa ô tìm kiếm và nút đăng nhập */}
-      <Header onOpenMenu={() => setIsMenuOpen(true)} /> 
-      
-      {/* Sidebar điều hướng menu trái */}
-      <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+      {/* CHỈ HIỆN HEADER VÀ SIDEBAR CŨ NẾU KHÔNG PHẢI LÀ TRANG ADMIN */}
+      {!isAdminPage && (
+        <>
+          <Header onOpenMenu={() => setIsMenuOpen(true)} /> 
+          <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+        </>
+      )}
 
       <main>
         <Routes>
@@ -37,15 +49,12 @@ function App() {
           <Route path="/movie/:id" element={<Detail />} />
           <Route path="/login" element={<Login />} />
           
-          {/* Logic cũ của bạn */}
           <Route path='/lich_su_xem' element={<LoveMovie />} />
           <Route path='/dang-ki' element={<Register />} />
 
-          {/* BỔ SUNG: Khai báo thêm các path mà trình duyệt đang báo lỗi không tìm thấy */}
           <Route path="/history" element={<WiewinghHistory />} />
           <Route path="/favorites" element={<LoveMovie />} />
 
-          {/* Các Route dành cho Menu lọc phim */}
           <Route path="/moi-nhat" element={<Home />} />
           <Route path="/3d" element={<Anime3D />} />
           <Route path="/2d" element={<Anime2D />} />
@@ -53,8 +62,16 @@ function App() {
           <Route path="/full" element={<Completed />} />
           <Route path="/trending" element={<Ongoing />} />
           <Route path="/ova" element={<MovieSingle />} />
-          /* Thêm dòng này vào App.jsx để xử lý khi click vào thể loại */
+          
           <Route path="/category/:id" element={<Anime2D />} />
+
+          {/* PHẦN CỦA ADMIN - ĐÃ SỬA LẠI PATH CHO KHỚP VỚI NÚT BẤM */}
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/movies" element={<AdminMovies />} />
+          {/* Sếp chú ý dòng dưới này nhé, phải là /admin/movies/add mới đúng bài */}
+          <Route path="/admin/movies/add" element={<AddMovie />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/episodes" element={<AddEpisode />} />
         </Routes>
       </main>
     </div>

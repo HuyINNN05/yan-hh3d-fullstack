@@ -19,10 +19,20 @@ function Login() {
       const res = await axios.post('http://localhost:5000/api/login', { email, password });
       
       if (res.data.message === "Thành công") {
-        // Lưu thông tin user vào localStorage để các trang khác biết đã đăng nhập
+        // --- GIỮ NGUYÊN LOGIC LƯU LOCALSTORAGE ---
         localStorage.setItem('user', JSON.stringify(res.data.user));
-        alert("Đăng nhập thành công!");
-        navigate('/'); // Chuyển về trang chủ
+        
+        // --- LOGIC PHÂN QUYỀN MỚI: ĐIỀU HƯỚNG THEO ROLE ---
+        if (res.data.user.role === 'admin') {
+          alert("Chào mừng Sếp quay trở lại khu vực quản trị!");
+          navigate('/admin'); // Bay thẳng vào trang Admin
+        } else {
+          alert("Đăng nhập thành công!");
+          navigate('/'); // Người dùng thường về trang chủ
+        }
+
+        // Reload nhẹ để các component như Header nhận diện trạng thái mới
+        window.location.reload();
       }
     } catch (err) {
       setError(err.response?.data?.message || "Có lỗi xảy ra, vui lòng thử lại");
@@ -88,7 +98,7 @@ function Login() {
             Chưa có tài khoản? 
             <Link to="/Accout">
                <button type="button" className="bg-[#ff5722] hover:bg-[#e64a19] text-white px-4 py-1 rounded ml-2 font-bold transition-colors uppercase">
-                 Đăng ký
+                  Đăng ký
                </button>
             </Link>
           </div>
