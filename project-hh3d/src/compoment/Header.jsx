@@ -1,15 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import axios from 'axios'; // Import axios để gọi API
-import { Search, History, Bookmark } from 'lucide-react'; 
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { Search, History, Bookmark, User, LogOut } from 'lucide-react'; 
 
 function Header({ onOpenMenu }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef(null);
+  
+  const [userData, setUserData] = useState(null);
+  const navigate = useNavigate();
 
-  // Logic gọi API tìm kiếm từ SQL
+  // Lấy dữ liệu user từ localStorage
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user) {
+      setUserData(user);
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setUserData(null);
+    navigate('/');
+  };
+
+  // Logic tìm kiếm
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (searchTerm.trim() === '') {
@@ -17,21 +34,20 @@ function Header({ onOpenMenu }) {
         return;
       }
 
-      // Gọi API tìm kiếm đã viết ở Backend (server-hh3d/index.js)
+      // API này yêu cầu bạn đã cập nhật file index.js (backend)
       axios.get(`http://localhost:5000/api/search?q=${searchTerm}`)
         .then(res => {
-          // Chỉ lấy tối đa 5 kết quả để hiển thị nhanh
           setSearchResults(res.data.slice(0, 5));
         })
         .catch(err => {
           console.error("Lỗi tìm kiếm:", err);
         });
-    }, 300); // Đợi 300ms sau khi ngừng gõ mới gọi API để tránh lag máy chủ
+    }, 300);
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
 
-  // Đóng bảng kết quả khi click chuột ra ngoài
+  // Đóng kết quả tìm kiếm khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (searchRef.current && !searchRef.current.contains(e.target)) setShowResults(false);
@@ -44,7 +60,7 @@ function Header({ onOpenMenu }) {
     <header className="bg-[#1a1a1a] text-white p-3 border-b border-gray-800 sticky top-0 z-50 shadow-xl">
       <div className="container mx-auto flex items-center justify-between gap-4">
         
-        {/* 1. KHU VỰC LOGO & MENU */}
+        {/* Logo và Nút Menu */}
         <div className="flex items-center gap-3">
           <button onClick={onOpenMenu} className="hover:text-[#26c6da] transition-colors">
              <div className="space-y-1">
@@ -58,7 +74,7 @@ function Header({ onOpenMenu }) {
           </Link>
         </div>
 
-        {/* 2. KHU VỰC Ô TÌM KIẾM */}
+        {/* Ô Tìm Kiếm */}
         <div className="relative flex-1 max-w-sm" ref={searchRef}>
           <div className="flex items-center bg-white rounded-sm overflow-hidden shadow-inner">
             <input
@@ -77,7 +93,7 @@ function Header({ onOpenMenu }) {
             </button>
           </div>
 
-          {/* Bảng kết quả tìm kiếm từ SQL */}
+          {/* Kết quả tìm kiếm đổ xuống */}
           {showResults && searchTerm && (
             <div className="absolute top-full left-0 w-full bg-[#1e1e1e] mt-1 rounded shadow-2xl border border-gray-700 overflow-hidden z-[100]">
               {searchResults.length > 0 ? (
@@ -107,8 +123,9 @@ function Header({ onOpenMenu }) {
           )}
         </div>
 
-        {/* 3. KHU VỰC TIỆN ÍCH */}
+        {/* Menu Điều hướng và Auth */}
         <div className="hidden md:flex items-center gap-8">
+          {/* Đã đồng bộ với App.jsx */}
           <Link to="/history" className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#26c6da] transition-all group">
               <History size={18} className="group-hover:scale-110 transition-transform" />
               <span className="text-[9px] font-black uppercase tracking-tighter">Lịch sử xem</span>
@@ -119,12 +136,38 @@ function Header({ onOpenMenu }) {
               <span className="text-[9px] font-black uppercase tracking-tighter">Phim yêu thích</span>
           </Link>
           
-          <Link 
-            to="/login" 
-            className="bg-[#26c6da] hover:bg-[#00acc1] text-white px-5 py-1.5 rounded-sm text-[11px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 shadow-cyan-900/20"
-          >
-              Đăng Nhập
-          </Link>
+          {userData ? (
+            <div className="flex items-center gap-3 bg-[#222] p-1 pr-3 rounded-sm border border-gray-700 group">
+              <div className="w-7 h-7 bg-[#26c6da] rounded-sm flex items-center justify-center text-white font-black text-xs">
+                {userData.username?.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-gray-200 uppercase leading-none">{userData.username}</span>
+                <button 
+                  onClick={handleLogout}
+                  className="text-[8px] text-gray-500 hover:text-red-500 uppercase font-bold text-left mt-1 flex items-center gap-1"
+                >
+                  <LogOut size={10} /> Thoát
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link 
+                to="/login" 
+                className="bg-[#26c6da] hover:bg-[#00acc1] text-white px-5 py-1.5 rounded-sm text-[11px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 shadow-cyan-900/20"
+              >
+                  Đăng Nhập
+              </Link>
+              {/* KHỚP VỚI path="/dang-ki" TRONG App.jsx */}
+              <Link 
+                to="/dang-ki" 
+                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-sm text-[11px] font-black uppercase transition-all"
+              >
+                  Đăng Ký
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </header>

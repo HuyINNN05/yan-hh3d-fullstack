@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom'; // Dùng Link thay thẻ a để không load lại trang
+import { Link } from 'react-router-dom'; 
 import axios from 'axios';
 import { ChevronLeft, Home, Clock, Heart, Flame } from 'lucide-react';
 
-// Menu tĩnh (Ít thay đổi thì ta để cứng ở đây cho nhẹ)
+// SỬA LỖI: Cập nhật URL để khớp chính xác với App.jsx
 const STATIC_MENU = [
   { id: 1, label: 'Trang Chủ', url: '/', icon: <Home size={18} />, color: 'text-white' },
+  // Khớp với path="/history" bạn đã thêm ở dòng 45 App.jsx
   { id: 2, label: 'Lịch Sử Xem', url: '/history', icon: <Clock size={18} />, color: 'text-gray-400' },
+  // Khớp với path="/favorites" bạn đã thêm ở dòng 46 App.jsx
   { id: 3, label: 'Phim Yêu Thích', url: '/favorites', icon: <Heart size={18} />, color: 'text-red-400' },
   { id: 4, label: 'Phim Hot Trend', url: '/trending', icon: <Flame size={18} />, color: 'text-orange-400' },
 ];
@@ -14,7 +16,7 @@ const STATIC_MENU = [
 function Sidebar({ isOpen, onClose }) {
   const [categories, setCategories] = useState([]);
 
-  // Gọi API lấy danh sách thể loại từ Database khi mở web
+  // Gọi API lấy danh sách thể loại (Giữ nguyên logic của bạn)
   useEffect(() => {
     axios.get('http://localhost:5000/api/categories')
       .then(res => {
@@ -25,7 +27,7 @@ function Sidebar({ isOpen, onClose }) {
 
   return (
     <>
-      {/* Overlay: Lớp phủ đen phía sau */}
+      {/* Overlay: Lớp phủ đen (Giữ nguyên) */}
       <div 
         className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] transition-opacity duration-300 ${isOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}
         onClick={onClose}
@@ -58,7 +60,7 @@ function Sidebar({ isOpen, onClose }) {
                  <Link 
                    key={link.id} 
                    to={link.url} 
-                   onClick={onClose} // Đóng menu khi click
+                   onClick={onClose} 
                    className={`flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-[#26c6da]/10 hover:border-[#26c6da] border border-transparent transition-all ${link.color}`}
                  >
                    {link.icon}
@@ -74,13 +76,11 @@ function Sidebar({ isOpen, onClose }) {
           <div className="p-6 pt-2">
             <h3 className="text-gray-500 text-[10px] font-bold mb-4 uppercase tracking-widest">Thể loại phim</h3>
             
-            {/* Grid hiển thị Categories */}
             {categories.length > 0 ? (
               <div className="grid grid-cols-2 gap-3">
                 {categories.map((cat) => (
                   <Link 
                     key={cat.id} 
-                    // Link này sẽ dẫn đến trang lọc phim theo category (cần làm sau này)
                     to={`/category/${cat.id}`} 
                     onClick={onClose}
                     className={`text-sm py-2 px-3 rounded bg-[#1a1a1a] border border-gray-800 hover:border-[#26c6da] hover:text-[#26c6da] transition-all text-center truncate ${cat.color_class || 'text-gray-300'}`}

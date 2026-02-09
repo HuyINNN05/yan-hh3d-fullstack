@@ -13,7 +13,8 @@ const db = mysql.createPool({
     database: 'yanhh3d_db'
 });
 
-// 1. API Lấy toàn bộ phim (Dùng cho trang Home và Anime3D)
+// --- CÁC API CŨ CỦA BẠN (GIỮ NGUYÊN) ---
+
 app.get('/api/movies', (req, res) => {
     const sql = "SELECT * FROM movies ORDER BY id DESC";
     db.query(sql, (err, data) => {
@@ -22,7 +23,29 @@ app.get('/api/movies', (req, res) => {
     });
 });
 
-// 2. API lấy phim theo thể loại (Dùng cho Anime2D - ID 7)
+// API TÌM KIẾM (GIỮ NGUYÊN)
+app.get('/api/search', (req, res) => {
+    const searchTerm = req.query.q;
+    if (!searchTerm) return res.json([]);
+    const sql = "SELECT * FROM movies WHERE title LIKE ? LIMIT 5";
+    db.query(sql, [`%${searchTerm}%`], (err, data) => {
+        if (err) return res.status(500).json(err);
+        return res.json(data);
+    });
+});
+
+// --- SỬA LẠI API TẬP PHIM (Để không bị lỗi 404 khi xem phim) ---
+app.get('/api/episodes/:movieId', (req, res) => {
+    const movieId = req.params.movieId;
+    // Thêm server_type vào SELECT để frontend phân loại được Vietsub/Thuyết minh
+    const sql = "SELECT * FROM episodes WHERE movie_id = ? ORDER BY episode_number ASC";
+    db.query(sql, [movieId], (err, data) => {
+        if (err) return res.status(500).json(err);
+        // Ngay cả khi không có tập nào cũng trả về mảng rỗng [] thay vì lỗi
+        return res.json(data);
+    });
+});
+
 app.get('/api/movies/category/:id', (req, res) => {
     const categoryId = req.params.id;
     const sql = `
@@ -37,7 +60,6 @@ app.get('/api/movies/category/:id', (req, res) => {
     });
 });
 
-// 3. API Lấy chi tiết 1 phim
 app.get('/api/movies/:id', (req, res) => {
     const id = req.params.id;
     const sql = `
@@ -53,7 +75,6 @@ app.get('/api/movies/:id', (req, res) => {
     });
 });
 
-// 4. API Lấy danh sách thể loại cho Sidebar
 app.get('/api/categories', (req, res) => {
     const sql = "SELECT * FROM categories";
     db.query(sql, (err, data) => {
@@ -62,7 +83,8 @@ app.get('/api/categories', (req, res) => {
     });
 });
 
-// 5. Auth APIs (Đăng nhập/Đăng ký)
+// --- API AUTH (GIỮ NGUYÊN) ---
+
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
     const sql = "SELECT * FROM users WHERE email = ? AND password = ?";
