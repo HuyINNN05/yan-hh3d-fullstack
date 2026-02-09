@@ -1,11 +1,34 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import MovieCard from '../../compoment/MovieCard.jsx';
 
-function Anime3D() {
+function Ongoing() {
+  const [movies, setMovies] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Gọi API lấy phim có status là 'Đang chiếu'
+    axios.get('http://localhost:5000/api/movies/status/Đang chiếu')
+      .then(res => {
+        setMovies(res.data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Lỗi:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) return <div className="text-cyan-500 text-center mt-20 font-bold">ĐANG TẢI PHIM ĐANG CHIẾU...</div>;
+
   return (
-    <div className="p-10 text-white">
-      <h1 className="text-2xl font-bold">Trang Hoạt Hình 3D</h1>
+    <div className="bg-[#0f0f0f] min-h-screen p-6">
+      <h2 className="text-2xl font-bold text-green-500 mb-8 border-l-4 border-green-500 pl-3 uppercase italic">Phim Đang Cập Nhật</h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+        {movies.map(movie => <MovieCard key={movie.id} movie={movie} />)}
+      </div>
     </div>
   );
 }
 
-export default Anime3D; // BẮT BUỘC PHẢI CÓ DÒNG NÀY
+export default Ongoing;

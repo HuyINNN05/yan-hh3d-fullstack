@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { MOVIES_DATA } from '../data';
 import MovieCard from '../compoment/MovieCard';
 import MovieButton from '../compoment/buttonn'; // Đảm bảo đúng tên file của bạn
 import { Plus, MessageCircle, Play } from 'lucide-react';

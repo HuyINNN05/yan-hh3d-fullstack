@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import axios from 'axios'; // Import axios để gọi API
 import { Search, History, Bookmark } from 'lucide-react'; 
-import { MOVIES_DATA } from '../data'; 
 
 function Header({ onOpenMenu }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -9,19 +9,29 @@ function Header({ onOpenMenu }) {
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef(null);
 
-  // Logic lọc phim khi gõ từ khóa tìm kiếm
+  // Logic gọi API tìm kiếm từ SQL
   useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setSearchResults([]);
-      return;
-    }
-    const filtered = MOVIES_DATA.filter(movie =>
-      movie.title.toLowerCase().includes(searchTerm.toLowerCase())
-    ).slice(0, 5);
-    setSearchResults(filtered);
+    const delayDebounceFn = setTimeout(() => {
+      if (searchTerm.trim() === '') {
+        setSearchResults([]);
+        return;
+      }
+
+      // Gọi API tìm kiếm đã viết ở Backend (server-hh3d/index.js)
+      axios.get(`http://localhost:5000/api/search?q=${searchTerm}`)
+        .then(res => {
+          // Chỉ lấy tối đa 5 kết quả để hiển thị nhanh
+          setSearchResults(res.data.slice(0, 5));
+        })
+        .catch(err => {
+          console.error("Lỗi tìm kiếm:", err);
+        });
+    }, 300); // Đợi 300ms sau khi ngừng gõ mới gọi API để tránh lag máy chủ
+
+    return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
 
-  // Đóng bảng kết quả khi click chuột ra ngoài vùng tìm kiếm
+  // Đóng bảng kết quả khi click chuột ra ngoài
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (searchRef.current && !searchRef.current.contains(e.target)) setShowResults(false);
@@ -53,7 +63,7 @@ function Header({ onOpenMenu }) {
           <div className="flex items-center bg-white rounded-sm overflow-hidden shadow-inner">
             <input
               type="text"
-              placeholder="Tìm kiếm phim..."
+              placeholder="Tìm kiếm phim từ database..."
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -67,7 +77,7 @@ function Header({ onOpenMenu }) {
             </button>
           </div>
 
-          {/* Bảng kết quả tìm kiếm nhanh */}
+          {/* Bảng kết quả tìm kiếm từ SQL */}
           {showResults && searchTerm && (
             <div className="absolute top-full left-0 w-full bg-[#1e1e1e] mt-1 rounded shadow-2xl border border-gray-700 overflow-hidden z-[100]">
               {searchResults.length > 0 ? (
@@ -78,32 +88,37 @@ function Header({ onOpenMenu }) {
                     onClick={() => {setSearchTerm(''); setShowResults(false);}}
                     className="flex items-center gap-3 p-2 hover:bg-[#26c6da]/20 border-b border-gray-800 last:border-0 transition-colors"
                   >
-                    <img src={movie.image} className="w-8 h-10 object-cover rounded shadow-md" alt="" />
-                    <span className="text-[11px] font-bold uppercase truncate text-gray-200">{movie.title}</span>
+                    <img 
+                      src={movie.image} 
+                      className="w-8 h-10 object-cover rounded shadow-md" 
+                      alt="" 
+                      onError={(e) => e.target.src = 'https://via.placeholder.com/50x70'}
+                    />
+                    <div className="flex flex-col">
+                        <span className="text-[11px] font-bold uppercase truncate text-gray-200">{movie.title}</span>
+                        <span className="text-[9px] text-[#26c6da]">{movie.year || '2024'}</span>
+                    </div>
                   </Link>
                 ))
               ) : (
-                <div className="p-3 text-[10px] text-gray-500 italic text-center uppercase">Không tìm thấy phim này...</div>
+                <div className="p-3 text-[10px] text-gray-500 italic text-center uppercase">Không tìm thấy phim này trong dữ liệu...</div>
               )}
             </div>
           )}
         </div>
 
-        {/* 3. KHU VỰC TIỆN ÍCH & USER */}
+        {/* 3. KHU VỰC TIỆN ÍCH */}
         <div className="hidden md:flex items-center gap-8">
-          {/* Lịch sử xem - Sửa lỗi chính tả & lồng thẻ */}
           <Link to="/history" className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#26c6da] transition-all group">
               <History size={18} className="group-hover:scale-110 transition-transform" />
               <span className="text-[9px] font-black uppercase tracking-tighter">Lịch sử xem</span>
           </Link>
 
-          {/* Phim yêu thích - Tách route riêng */}
           <Link to="/favorites" className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#26c6da] transition-all group">
               <Bookmark size={18} className="group-hover:scale-110 transition-transform" />
               <span className="text-[9px] font-black uppercase tracking-tighter">Phim yêu thích</span>
           </Link>
           
-          {/* NÚT ĐĂNG NHẬP */}
           <Link 
             to="/login" 
             className="bg-[#26c6da] hover:bg-[#00acc1] text-white px-5 py-1.5 rounded-sm text-[11px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 shadow-cyan-900/20"
@@ -111,7 +126,6 @@ function Header({ onOpenMenu }) {
               Đăng Nhập
           </Link>
         </div>
-
       </div>
     </header>
   );

@@ -1,36 +1,66 @@
-import React from 'react'; 
-import { Link } from 'react-router-dom'; 
-// Dùng { movie } đại diện cho MỘT bộ phim được truyền vào
-function MovieCard({ movie }) {
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { Link } from 'react-router-dom';
+import { Play } from 'lucide-react';
+
+function Anime2D() {
+  const [movies, setMovies] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Gọi API lấy phim theo ID thể loại 2D (Bạn đang để là 7)
+    axios.get('http://localhost:5000/api/movies/category/7') 
+      .then(res => {
+        setMovies(res.data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Lỗi:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) return <div className="text-white text-center mt-20 font-bold animate-pulse">ĐANG TẢI PHIM 2D...</div>;
+
   return (
-    <Link to={`/movie/${movie.id}`} className="block">
-        <div className="relative group bg-[#1a1a1a] rounded-lg overflow-hidden cursor-pointer shadow-md hover:shadow-orange-500/20 transition-all duration-300">
-      <div className="relative aspect-[2/3] overflow-hidden">
-        <img 
-          src={movie.image} 
-          alt={movie.title} 
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-100" />
-        
-        {/* Sửa lại tất cả thành movie.xxx */}
-        <span className="absolute top-2 left-2 bg-gradient-to-r from-orange-600 to-orange-400 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm">
-          {movie.episode}
-        </span>
-        
-        <span className="absolute bottom-2 left-2 bg-cyan-400 text-black text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm">
-          {movie.quality}
-        </span>
+    <div className="bg-[#0f0f0f] min-h-screen p-6">
+      <div className="flex items-center justify-between mb-8">
+         <h2 className="text-2xl font-bold text-[#26c6da] border-l-4 border-[#26c6da] pl-3 uppercase italic">Thế giới Hoạt Hình 2D</h2>
+         <span className="text-gray-500 text-sm font-bold">{movies.length} bộ phim</span>
       </div>
       
-      <div className="p-2.5">
-        <h3 className="text-gray-200 text-sm font-medium truncate group-hover:text-orange-500 transition-colors">
-          {movie.title}
-        </h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+        {movies.length > 0 ? (
+          movies.map((movie) => (
+            <Link to={`/movie/${movie.id}`} key={movie.id} className="group relative block transition-all hover:-translate-y-2">
+              <div className="overflow-hidden rounded-xl aspect-[2/3] border border-gray-800 shadow-lg relative">
+                <img 
+                  src={movie.image} 
+                  alt={movie.title} 
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  onError={(e) => {e.target.src = 'https://via.placeholder.com/300x450'}} 
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <div className="bg-[#26c6da] p-3 rounded-full scale-50 group-hover:scale-100 transition-all">
+                    <Play className="text-black w-8 h-8 fill-current" />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4">
+                <h3 className="text-white font-bold truncate group-hover:text-[#26c6da] transition-colors">{movie.title}</h3>
+                <div className="flex items-center justify-between mt-1">
+                   <p className="text-gray-500 text-xs font-medium">{movie.category_name || "Anime 2D"}</p>
+                   <span className="text-[10px] bg-gray-800 px-2 py-0.5 rounded text-gray-400">Tập {movie.episode_display}</span>
+                </div>
+              </div>
+            </Link>
+          ))
+        ) : (
+          <div className="col-span-full text-center text-gray-600 py-20 uppercase text-xs tracking-widest">Hiện chưa có phim 2D nào.</div>
+        )}
       </div>
     </div>
-    </Link>
   );
 }
 
-export default MovieCard;
+export default Anime2D;
