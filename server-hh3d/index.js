@@ -113,16 +113,13 @@ app.get('/api/admin/movies', (req, res) => {
 });
 
 app.post('/api/admin/movies', (req, res) => {
-    // THÊM: video_url vào đây sếp nhé
     const { title, image, description, category_id, status, episode_display, show_schedule, video_url } = req.body;
-    
-    // SỬA: Câu lệnh SQL INSERT phải có 8 dấu chấm hỏi tương ứng với 8 cột
     const sql = "INSERT INTO movies (title, image, description, category_id, status, episode_display, show_schedule, video_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
     const values = [title, image, description, category_id, status, episode_display, show_schedule, video_url];
     
     db.query(sql, values, (err, result) => {
         if (err) {
-            console.error("Lỗi thêm phim:", err); // In lỗi ra console để sếp dễ soi
+            console.error("Lỗi thêm phim:", err); 
             return res.status(500).json(err);
         }
         return res.json({ message: "Thêm phim thành công!", id: result.insertId });
@@ -138,8 +135,50 @@ app.delete('/api/admin/movies/:id', (req, res) => {
     });
 });
 
+// --- THÊM MỚI: API QUẢN LÝ NGƯỜI DÙNG (ADMIN) ---
 app.get('/api/admin/users', (req, res) => {
-    const sql = "SELECT id, username, email, role FROM users ORDER BY id DESC";
+    const sql = "SELECT id, username, email, role, created_at FROM users ORDER BY id DESC";
+    db.query(sql, (err, data) => {
+        if (err) return res.status(500).json(err);
+        return res.json(data);
+    });
+});
+
+app.delete('/api/admin/users/:id', (req, res) => {
+    const id = req.params.id;
+    const sql = "DELETE FROM users WHERE id = ?";
+    db.query(sql, [id], (err, result) => {
+        if (err) return res.status(500).json(err);
+        return res.json({ message: "Đã xóa người dùng!" });
+    });
+});
+
+// --- THÊM MỚI: API QUẢN LÝ TẬP PHIM (ADMIN) ---
+
+// 1. Thêm tập phim mới (Giải quyết lỗi 404 sếp gặp phải)
+app.post('/api/admin/episodes', (req, res) => {
+    // Bỏ title ra khỏi danh sách nhận và danh sách values
+    const { movie_id, episode_number, video_url, server_type } = req.body;
+    const sql = "INSERT INTO episodes (movie_id, episode_number, video_url, server_type) VALUES (?, ?, ?, ?)";
+    const values = [movie_id, episode_number, video_url, server_type || 'Thuyết Minh'];
+    
+    db.query(sql, values, (err, result) => {
+        if (err) {
+            console.error("Lỗi MySQL:", err);
+            return res.status(500).json(err);
+        }
+        return res.json({ message: "Thành công sếp ơi!" });
+    });
+});
+
+// 2. Lấy danh sách tập phim để quản lý (Nếu sếp cần)
+app.get('/api/admin/episodes', (req, res) => {
+    const sql = `
+        SELECT episodes.*, movies.title as movie_title 
+        FROM episodes 
+        JOIN movies ON episodes.movie_id = movies.id 
+        ORDER BY episodes.id DESC
+    `;
     db.query(sql, (err, data) => {
         if (err) return res.status(500).json(err);
         return res.json(data);

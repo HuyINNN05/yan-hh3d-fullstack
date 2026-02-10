@@ -79,7 +79,7 @@ function Header({ onOpenMenu }) {
           <div className="flex items-center bg-white rounded-sm overflow-hidden shadow-inner">
             <input
               type="text"
-              placeholder="Tìm kiếm phim từ database..."
+              placeholder="Tìm kiếm phim"
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);

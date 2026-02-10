@@ -12,7 +12,6 @@ function Detail() {
   const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // --- GIỮ NGUYÊN STATE CHO TẬP PHIM ---
   const [episodes, setEpisodes] = useState([]); 
   const [currentEpisode, setCurrentEpisode] = useState(null); 
   const [serverType, setServerType] = useState('Thuyết Minh'); 
@@ -30,6 +29,7 @@ function Detail() {
         
         setEpisodes(epRes.data);
         if (epRes.data.length > 0) {
+          // Ưu tiên Thuyết Minh khi mới vào trang
           const defaultEp = epRes.data.find(e => e.server_type === 'Thuyết Minh') || epRes.data[0];
           setCurrentEpisode(defaultEp);
         }
@@ -37,19 +37,9 @@ function Detail() {
         setLoading(false);
         window.scrollTo(0, 0);
 
-        // --- GIỮ NGUYÊN LOGIC LƯU LỊCH SỬ ---
-        const history = JSON.parse(localStorage.getItem('viewing_history')) || [];
-        const filteredHistory = history.filter(item => item.id !== movieData.id);
-        const newHistory = [{
-          id: movieData.id,
-          title: movieData.title,
-          image: movieData.image?.startsWith('/') ? movieData.image : `/${movieData.image}`,
-          episode_display: movieData.episode_display,
-          time: new Date().toLocaleTimeString('vi-VN')
-        }, ...filteredHistory].slice(0, 20);
-        localStorage.setItem('viewing_history', JSON.stringify(newHistory));
+        // Lưu lịch sử lần đầu vào trang
+        saveToHistory(movieData, epRes.data[0]);
 
-        // --- GIỮ NGUYÊN LOGIC KIỂM TRA YÊU THÍCH ---
         const favorites = JSON.parse(localStorage.getItem('favorite_movies')) || [];
         setIsFavorite(favorites.some(item => item.id === movieData.id));
       })
@@ -58,6 +48,29 @@ function Detail() {
         setLoading(false);
       });
   }, [id]);
+
+  // --- HÀM LƯU LỊCH SỬ DÙNG CHUNG (Để gọi lại khi đổi tập) ---
+  const saveToHistory = (movieData, episode) => {
+    const history = JSON.parse(localStorage.getItem('viewing_history')) || [];
+    const filteredHistory = history.filter(item => item.id !== movieData.id);
+    const newHistory = [{
+      id: movieData.id,
+      title: movieData.title,
+      image: movieData.image?.startsWith('/') ? movieData.image : `/${movieData.image}`,
+      // Cập nhật hiển thị tập đang xem vào lịch sử cho xịn
+      episode_display: episode ? `Tập ${episode.episode_number}` : movieData.episode_display,
+      time: new Date().toLocaleTimeString('vi-VN')
+    }, ...filteredHistory].slice(0, 20);
+    localStorage.setItem('viewing_history', JSON.stringify(newHistory));
+  };
+
+  // --- XỬ LÝ KHI BẤM CHỌN TẬP ---
+  const handleEpisodeClick = (ep) => {
+    setCurrentEpisode(ep);
+    saveToHistory(movie, ep); // Cập nhật lại lịch sử khi đổi tập
+    // Cuộn nhẹ lên đầu Player để người dùng biết tập đã đổi
+    document.querySelector('.container')?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const handleToggleFavorite = () => {
     const favorites = JSON.parse(localStorage.getItem('favorite_movies')) || [];
@@ -96,26 +109,27 @@ function Detail() {
     <div className="min-h-screen bg-[#0f0f0f] text-gray-300 font-sans">
       <div className="container mx-auto px-4 py-6">
         
-        {/* Breadcrumb */}
+        {/* Breadcrumb - Cập nhật số tập động */}
         <nav className="text-[10px] text-gray-500 mb-4 flex gap-2 uppercase tracking-widest">
           <Link to="/" className="hover:text-white transition-colors">Trang chủ</Link> / 
           <span className="text-cyan-500">{movie.title} {currentEpisode ? `- Tập ${currentEpisode.episode_number}` : ''}</span>
         </nav>
 
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* CỘT TRÁI: PLAYER */}
           <div className="flex-1">
+            {/* Player: Link video sẽ tự đổi khi currentEpisode thay đổi */}
             <div className="relative bg-black rounded-lg overflow-hidden border border-white/5 aspect-video shadow-2xl">
               {currentEpisode ? (
                 <iframe
+                  key={currentEpisode.id} // Thêm key để React ép Iframe tải lại link mới hoàn toàn
                   src={currentEpisode.video_url}
                   className="w-full h-full"
                   allowFullScreen
                   title="Movie Player"
                 />
               ) : (
-                <div className="flex items-center justify-center h-full text-gray-600 italic">
-                   Vui lòng chọn tập phim bên dưới...
+                <div className="flex items-center justify-center h-full text-gray-600 italic uppercase font-black text-[10px] tracking-widest">
+                   Phim đang được cập nhật tập mới...
                 </div>
               )}
             </div>
@@ -126,7 +140,12 @@ function Detail() {
                 {['Thuyết Minh', 'Vietsub'].map(type => (
                   <button
                     key={type}
-                    onClick={() => setServerType(type)}
+                    onClick={() => {
+                      setServerType(type);
+                      // Tự động chọn tập đầu tiên của server đó khi đổi server
+                      const firstEpOfServer = episodes.find(e => e.server_type === type);
+                      if (firstEpOfServer) setCurrentEpisode(firstEpOfServer);
+                    }}
                     className={`px-6 py-3 text-[11px] font-black uppercase tracking-widest transition-all ${
                       serverType === type ? 'bg-cyan-600 text-white' : 'text-gray-500 hover:text-white'
                     }`}
@@ -141,11 +160,11 @@ function Detail() {
                   filteredEpisodes.map((ep) => (
                     <button
                       key={ep.id}
-                      onClick={() => setCurrentEpisode(ep)}
+                      onClick={() => handleEpisodeClick(ep)} // Dùng hàm mới để cập nhật lịch sử luôn
                       className={`py-2 text-[11px] font-bold rounded-sm border transition-all ${
                         currentEpisode?.id === ep.id 
                         ? 'bg-cyan-600 border-cyan-600 text-white shadow-lg shadow-cyan-900/40' 
-                        : 'bg-[#222] border-gray-800 text-gray-400 hover:border-cyan-500'
+                        : 'bg-[#222] border-gray-800 text-gray-400 hover:border-cyan-500 hover:text-white'
                       }`}
                     >
                       {ep.episode_number} {ep.is_end ? 'End' : ''}
@@ -153,14 +172,14 @@ function Detail() {
                   ))
                 ) : (
                   <div className="col-span-full p-4 text-center text-xs italic text-gray-600">
-                    Hiện chưa có tập phim nào cho server này.
+                    Hiện chưa có tập phim nào cho bản {serverType}.
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* CỘT PHẢI: INFO */}
+          {/* CỘT PHẢI: INFO (Giữ nguyên của sếp) */}
           <div className="lg:w-80 flex-shrink-0">
             <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-4 leading-tight">
               {movie.title}
@@ -197,7 +216,7 @@ function Detail() {
           </div>
         </div>
 
-        {/* --- PHẦN ĐỀ XUẤT ĐÃ SỬA LỖI HIỂN THỊ --- */}
+        {/* --- PHẦN ĐỀ XUẤT (Giữ nguyên của sếp) --- */}
         <div className="mt-12 flex flex-col lg:flex-row gap-10">
           <div className="flex-1">
              <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2 uppercase italic border-l-4 border-cyan-500 pl-3">
@@ -210,7 +229,6 @@ function Detail() {
 
              <div className="mt-12">
                <h3 className="text-lg font-bold text-cyan-400 mb-8 uppercase italic tracking-widest border-b border-white/5 pb-4">Có Thể Bạn Thích</h3>
-               {/* Grid 5 cột chuẩn đẹp */}
                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6">
                   {allMovies
                     .filter(m => m.id !== movie.id)
@@ -222,7 +240,6 @@ function Detail() {
              </div>
           </div>
 
-          {/* Sidebar Phim Xem Nhiều */}
           <aside className="lg:w-80">
             <div className="bg-[#161616] rounded-2xl p-6 border border-white/5 sticky top-5 shadow-xl">
               <h3 className="text-orange-500 font-bold mb-8 text-center border-b border-white/5 pb-4 uppercase tracking-[4px] text-[10px]">Phim Xem Nhiều</h3>
