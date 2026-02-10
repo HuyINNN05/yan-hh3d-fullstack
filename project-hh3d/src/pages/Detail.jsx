@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import axios from 'axios';
 import MovieCard from '../compoment/MovieCard';
 import MovieButton from '../compoment/buttonn';
-import { Plus, MessageCircle, PlayCircle, Heart } from 'lucide-react';
+import { Plus, MessageCircle, PlayCircle, Heart, Send } from 'lucide-react';
 
 function Detail() {
   const { id } = useParams();
@@ -16,20 +16,25 @@ function Detail() {
   const [currentEpisode, setCurrentEpisode] = useState(null); 
   const [serverType, setServerType] = useState('Thuyết Minh'); 
 
+  const [comments, setComments] = useState([]);
+  const [commentInput, setCommentInput] = useState("");
+  const user = JSON.parse(localStorage.getItem('user'));
+
   useEffect(() => {
     const fetchMovieDetail = axios.get(`http://localhost:5000/api/movies/${id}`);
     const fetchAllMovies = axios.get('http://localhost:5000/api/movies');
     const fetchEpisodes = axios.get(`http://localhost:5000/api/episodes/${id}`); 
+    const fetchComments = axios.get(`http://localhost:5000/api/comments/${id}`);
 
-    Promise.all([fetchMovieDetail, fetchAllMovies, fetchEpisodes])
-      .then(([detailRes, allRes, epRes]) => {
+    Promise.all([fetchMovieDetail, fetchAllMovies, fetchEpisodes, fetchComments])
+      .then(([detailRes, allRes, epRes, commentRes]) => {
         const movieData = detailRes.data;
         setMovie(movieData);
         setAllMovies(allRes.data);
-        
         setEpisodes(epRes.data);
+        setComments(commentRes.data);
+
         if (epRes.data.length > 0) {
-          // Ưu tiên Thuyết Minh khi mới vào trang
           const defaultEp = epRes.data.find(e => e.server_type === 'Thuyết Minh') || epRes.data[0];
           setCurrentEpisode(defaultEp);
         }
@@ -37,7 +42,6 @@ function Detail() {
         setLoading(false);
         window.scrollTo(0, 0);
 
-        // Lưu lịch sử lần đầu vào trang
         saveToHistory(movieData, epRes.data[0]);
 
         const favorites = JSON.parse(localStorage.getItem('favorite_movies')) || [];
@@ -49,27 +53,42 @@ function Detail() {
       });
   }, [id]);
 
-  // --- HÀM LƯU LỊCH SỬ DÙNG CHUNG (Để gọi lại khi đổi tập) ---
+  const handleSendComment = async (e) => {
+    e.preventDefault();
+    if (!commentInput.trim() || !user) return;
+
+    try {
+      await axios.post('http://localhost:5000/api/comments', {
+        user_id: user.id,
+        movie_id: id,
+        content: commentInput
+      });
+      const res = await axios.get(`http://localhost:5000/api/comments/${id}`);
+      setComments(res.data);
+      setCommentInput(""); 
+    } catch (err) {
+      alert("Lỗi gửi bình luận rồi sếp!");
+    }
+  };
+
   const saveToHistory = (movieData, episode) => {
     const history = JSON.parse(localStorage.getItem('viewing_history')) || [];
     const filteredHistory = history.filter(item => item.id !== movieData.id);
+    const imgUrl = movieData.image?.startsWith('http') ? movieData.image : `/image/${movieData.image}`;
     const newHistory = [{
       id: movieData.id,
       title: movieData.title,
-      image: movieData.image?.startsWith('/') ? movieData.image : `/${movieData.image}`,
-      // Cập nhật hiển thị tập đang xem vào lịch sử cho xịn
+      image: imgUrl,
       episode_display: episode ? `Tập ${episode.episode_number}` : movieData.episode_display,
       time: new Date().toLocaleTimeString('vi-VN')
     }, ...filteredHistory].slice(0, 20);
     localStorage.setItem('viewing_history', JSON.stringify(newHistory));
   };
 
-  // --- XỬ LÝ KHI BẤM CHỌN TẬP ---
   const handleEpisodeClick = (ep) => {
     setCurrentEpisode(ep);
-    saveToHistory(movie, ep); // Cập nhật lại lịch sử khi đổi tập
-    // Cuộn nhẹ lên đầu Player để người dùng biết tập đã đổi
-    document.querySelector('.container')?.scrollIntoView({ behavior: 'smooth' });
+    saveToHistory(movie, ep);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleToggleFavorite = () => {
@@ -79,10 +98,11 @@ function Detail() {
       updatedFavorites = favorites.filter(item => item.id !== movie.id);
       setIsFavorite(false);
     } else {
+      const imgUrl = movie.image?.startsWith('http') ? movie.image : `/image/${movie.image}`;
       const favoriteItem = {
         id: movie.id,
         title: movie.title,
-        image: movie.image?.startsWith('/') ? movie.image : `/${movie.image}`,
+        image: imgUrl,
         episode_display: movie.episode_display
       };
       updatedFavorites = [favoriteItem, ...favorites];
@@ -108,8 +128,6 @@ function Detail() {
   return (
     <div className="min-h-screen bg-[#0f0f0f] text-gray-300 font-sans">
       <div className="container mx-auto px-4 py-6">
-        
-        {/* Breadcrumb - Cập nhật số tập động */}
         <nav className="text-[10px] text-gray-500 mb-4 flex gap-2 uppercase tracking-widest">
           <Link to="/" className="hover:text-white transition-colors">Trang chủ</Link> / 
           <span className="text-cyan-500">{movie.title} {currentEpisode ? `- Tập ${currentEpisode.episode_number}` : ''}</span>
@@ -117,11 +135,10 @@ function Detail() {
 
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="flex-1">
-            {/* Player: Link video sẽ tự đổi khi currentEpisode thay đổi */}
             <div className="relative bg-black rounded-lg overflow-hidden border border-white/5 aspect-video shadow-2xl">
               {currentEpisode ? (
                 <iframe
-                  key={currentEpisode.id} // Thêm key để React ép Iframe tải lại link mới hoàn toàn
+                  key={currentEpisode.id}
                   src={currentEpisode.video_url}
                   className="w-full h-full"
                   allowFullScreen
@@ -129,12 +146,11 @@ function Detail() {
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-600 italic uppercase font-black text-[10px] tracking-widest">
-                   Phim đang được cập nhật tập mới...
+                    Phim đang được cập nhật tập mới...
                 </div>
               )}
             </div>
 
-            {/* Chọn Server & Tập */}
             <div className="mt-6 bg-[#161616] rounded-xl border border-white/5 overflow-hidden shadow-lg">
               <div className="flex border-b border-white/5 bg-black/20">
                 {['Thuyết Minh', 'Vietsub'].map(type => (
@@ -142,7 +158,6 @@ function Detail() {
                     key={type}
                     onClick={() => {
                       setServerType(type);
-                      // Tự động chọn tập đầu tiên của server đó khi đổi server
                       const firstEpOfServer = episodes.find(e => e.server_type === type);
                       if (firstEpOfServer) setCurrentEpisode(firstEpOfServer);
                     }}
@@ -160,7 +175,7 @@ function Detail() {
                   filteredEpisodes.map((ep) => (
                     <button
                       key={ep.id}
-                      onClick={() => handleEpisodeClick(ep)} // Dùng hàm mới để cập nhật lịch sử luôn
+                      onClick={() => handleEpisodeClick(ep)}
                       className={`py-2 text-[11px] font-bold rounded-sm border transition-all ${
                         currentEpisode?.id === ep.id 
                         ? 'bg-cyan-600 border-cyan-600 text-white shadow-lg shadow-cyan-900/40' 
@@ -179,8 +194,7 @@ function Detail() {
             </div>
           </div>
 
-          {/* CỘT PHẢI: INFO (Giữ nguyên của sếp) */}
-          <div className="lg:w-80 flex-shrink-0">
+          <aside className="lg:w-80 flex-shrink-0">
             <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-4 leading-tight">
               {movie.title}
             </h1>
@@ -196,66 +210,119 @@ function Detail() {
             </button>
 
             <div className="bg-[#161616] p-5 rounded-xl border border-white/5 space-y-4 shadow-md">
-               <div className="flex justify-between text-[11px] font-bold uppercase tracking-tight border-b border-white/5 pb-2">
-                  <span className="text-gray-500">Thời lượng:</span> <span>{movie.episode_display}</span>
-               </div>
-               <div className="flex justify-between text-[11px] font-bold uppercase tracking-tight border-b border-white/5 pb-2">
-                  <span className="text-gray-500">Trạng thái:</span> <span className="text-green-500 uppercase tracking-widest">{movie.status}</span>
-               </div>
-               <div className="flex justify-between text-[11px] font-bold uppercase tracking-tight border-b border-white/5 pb-2">
-                  <span className="text-gray-500">Năm:</span> <span>2024</span>
-               </div>
-               <div className="flex justify-between text-[11px] font-bold uppercase tracking-tight">
-                  <span className="text-gray-500">Lịch chiếu:</span> <span className="text-orange-400">{movie.show_schedule}</span>
-               </div>
+                <div className="flex justify-between text-[11px] font-bold uppercase tracking-tight border-b border-white/5 pb-2">
+                   <span className="text-gray-500">Thời lượng:</span> <span>{movie.episode_display}</span>
+                </div>
+                <div className="flex justify-between text-[11px] font-bold uppercase tracking-tight border-b border-white/5 pb-2">
+                   <span className="text-gray-500">Trạng thái:</span> <span className="text-green-500 uppercase tracking-widest">{movie.status}</span>
+                </div>
+                <div className="flex justify-between text-[11px] font-bold uppercase tracking-tight border-b border-white/5 pb-2">
+                   <span className="text-gray-500">Năm:</span> <span>2024</span>
+                </div>
+                <div className="flex justify-between text-[11px] font-bold uppercase tracking-tight">
+                   <span className="text-gray-500">Lịch chiếu:</span> <span className="text-orange-400">{movie.show_schedule}</span>
+                </div>
             </div>
 
             <p className="mt-6 text-[12px] text-gray-500 leading-relaxed italic border-l-2 border-gray-800 pl-3">
               {movie.description || "Nội dung phim đang được cập nhật..."}
             </p>
-          </div>
+          </aside>
         </div>
 
-        {/* --- PHẦN ĐỀ XUẤT (Giữ nguyên của sếp) --- */}
         <div className="mt-12 flex flex-col lg:flex-row gap-10">
           <div className="flex-1">
-             <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2 uppercase italic border-l-4 border-cyan-500 pl-3">
-               <MessageCircle className="text-cyan-400" size={20} /> Bình luận
-             </h3>
-             <div className="bg-[#161616] p-10 rounded-2xl border border-white/5 text-center shadow-inner">
-                <Link to="/Login"><MovieButton title="Đăng nhập để bình luận" className="mb-4 px-10" /></Link>
-                <p className="text-gray-600 text-[10px] uppercase tracking-widest">Tuân thủ nội quy cộng đồng</p>
-             </div>
+              <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2 uppercase italic border-l-4 border-cyan-500 pl-3">
+                <MessageCircle className="text-cyan-400" size={20} /> Bình luận ({comments.length})
+              </h3>
 
-             <div className="mt-12">
-               <h3 className="text-lg font-bold text-cyan-400 mb-8 uppercase italic tracking-widest border-b border-white/5 pb-4">Có Thể Bạn Thích</h3>
-               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6">
-                  {allMovies
-                    .filter(m => m.id !== movie.id)
-                    .slice(0, 10)
-                    .map(m => (
-                      <MovieCard key={`rel-${m.id}`} movie={m} />
-                    ))}
-               </div>
-             </div>
+              <div className="bg-[#161616] p-6 rounded-2xl border border-white/5 shadow-inner mb-8">
+                 {user ? (
+                   <form onSubmit={handleSendComment} className="flex flex-col gap-3">
+                     <div className="flex items-center gap-3 mb-2">
+                       <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center text-xs font-bold text-white uppercase">
+                         {user.username.charAt(0)}
+                       </div>
+                       <span className="text-sm font-bold text-gray-300">{user.username}</span>
+                     </div>
+                     <textarea 
+                       value={commentInput}
+                       onChange={(e) => setCommentInput(e.target.value)}
+                       className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-gray-300 focus:border-cyan-500 outline-none transition-all"
+                       placeholder="Chia sẻ cảm nghĩ của sếp về bộ phim này..."
+                       rows="3"
+                     ></textarea>
+                     <div className="flex justify-end">
+                       <button type="submit" className="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-2 rounded-lg font-bold text-[10px] uppercase flex items-center gap-2 transition-all">
+                         <Send size={12} /> Gửi bình luận
+                       </button>
+                     </div>
+                   </form>
+                 ) : (
+                   <div className="text-center py-4">
+                     <Link to="/Login"><MovieButton title="Đăng nhập để bình luận" className="mb-4 px-10" /></Link>
+                     <p className="text-gray-600 text-[10px] uppercase tracking-widest">Tuân thủ nội quy cộng đồng</p>
+                   </div>
+                 )}
+              </div>
+
+              <div className="space-y-6">
+                 {comments.length > 0 ? (
+                   comments.map((cmt) => (
+                     <div key={cmt.id} className="flex gap-4 group">
+                       <div className="w-10 h-10 rounded-full bg-gray-900 border border-gray-800 flex items-center justify-center font-bold text-gray-500 uppercase flex-shrink-0">
+                         {cmt.username.charAt(0)}
+                       </div>
+                       <div className="flex-1">
+                         <div className="flex items-center gap-3 mb-1">
+                           <span className="text-cyan-500 font-bold text-xs">{cmt.username}</span>
+                           <span className="text-[9px] text-gray-700 uppercase">{new Date(cmt.created_at).toLocaleDateString('vi-VN')}</span>
+                         </div>
+                         <p className="text-gray-400 text-sm leading-relaxed bg-black/20 p-3 rounded-lg border border-white/5">
+                           {cmt.content}
+                         </p>
+                       </div>
+                     </div>
+                   ))
+                 ) : (
+                   <div className="text-center py-10 text-gray-700 italic text-sm">
+                     Chưa có bình luận nào. Hãy là người đầu tiên bóc tem phim này sếp ơi!
+                   </div>
+                 )}
+              </div>
+
+              <div className="mt-16">
+                <h3 className="text-lg font-bold text-cyan-400 mb-8 uppercase italic tracking-widest border-b border-white/5 pb-4">Có Thể Bạn Thích</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6">
+                   {allMovies
+                     .filter(m => m.id !== parseInt(id))
+                     .slice(0, 10)
+                     .map(m => (
+                       <MovieCard key={`rel-${m.id}`} movie={m} />
+                     ))}
+                </div>
+              </div>
           </div>
 
           <aside className="lg:w-80">
             <div className="bg-[#161616] rounded-2xl p-6 border border-white/5 sticky top-5 shadow-xl">
               <h3 className="text-orange-500 font-bold mb-8 text-center border-b border-white/5 pb-4 uppercase tracking-[4px] text-[10px]">Phim Xem Nhiều</h3>
               <div className="space-y-5">
-                 {allMovies.slice(0, 8).map((m, index) => (
-                   <Link to={`/movie/${m.id}`} key={`rank-${m.id}`} className="flex items-center gap-4 group border-b border-white/5 pb-4 last:border-0">
-                      <span className={`text-2xl font-black italic ${index < 3 ? 'text-cyan-400' : 'text-gray-700'}`}>{(index + 1).toString().padStart(2, '0')}</span>
-                      <div className="w-12 h-14 flex-shrink-0 overflow-hidden rounded border border-gray-800">
-                        <img src={m.image?.startsWith('/') ? m.image : `/${m.image}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform" alt="" />
-                      </div>
-                      <div className="overflow-hidden">
-                        <h4 className="text-[11px] font-bold group-hover:text-cyan-400 uppercase truncate transition-colors">{m.title}</h4>
-                        <p className="text-[9px] text-gray-600 mt-1 italic font-bold">Tập {m.episode_display}</p>
-                      </div>
-                   </Link>
-                 ))}
+                 {allMovies.slice(0, 8).map((m, index) => {
+                    const sideImg = m.image?.startsWith('http') ? m.image : `/image/${m.image}`;
+                    return (
+                      <Link to={`/movie/${m.id}`} key={`rank-${m.id}`} className="flex items-center gap-4 group border-b border-white/5 pb-4 last:border-0">
+                        <span className={`text-2xl font-black italic ${index < 3 ? 'text-cyan-400' : 'text-gray-700'}`}>{(index + 1).toString().padStart(2, '0')}</span>
+                        <div className="w-12 h-14 flex-shrink-0 overflow-hidden rounded border border-gray-800">
+                          <img src={sideImg} className="w-full h-full object-cover group-hover:scale-110 transition-transform" alt="" />
+                        </div>
+                        <div className="overflow-hidden">
+                          <h4 className="text-[11px] font-bold group-hover:text-cyan-400 uppercase truncate transition-colors">{m.title}</h4>
+                          <p className="text-[9px] text-gray-600 mt-1 italic font-bold">Tập {m.episode_display}</p>
+                        </div>
+                      </Link>
+                    )
+                 })}
               </div>
             </div>
           </aside>

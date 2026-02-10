@@ -62,31 +62,43 @@ function AdminMovies() {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {movies.map((movie) => (
-              <tr key={movie.id} className="hover:bg-white/[0.02] transition-colors group">
-                <td className="p-6 text-xs font-bold text-gray-600">#{movie.id}</td>
-                <td className="p-6">
-                  <div className="w-12 h-16 rounded-lg bg-black border border-white/10 overflow-hidden shadow-lg">
-                    {movie.image ? <img src={movie.image} className="w-full h-full object-cover" alt="" /> : <Film size={16} className="m-auto mt-6 text-gray-800" />}
-                  </div>
-                </td>
-                <td className="p-6">
-                  <div className="font-black text-white text-sm uppercase italic group-hover:text-cyan-400 transition-colors">{movie.title}</div>
-                  <div className="text-[10px] text-gray-500 font-bold mt-1 uppercase tracking-tighter">Tập: {movie.episode_display || 'Chưa cập nhật'}</div>
-                </td>
-                <td className="p-6 text-center">
-                  <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${movie.status === 'Hoàn thành' ? 'bg-green-500/10 text-green-500' : 'bg-orange-500/10 text-orange-500'}`}>
-                    {movie.status}
-                  </span>
-                </td>
-                <td className="p-6 text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <button className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-all"><Edit2 size={16} /></button>
-                    <button onClick={() => handleDelete(movie.id)} className="p-2 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {movies.map((movie) => {
+               const adminImg = movie.image?.startsWith('http') ? movie.image : `/image/${movie.image}`;
+               return (
+                <tr key={movie.id} className="hover:bg-white/[0.02] transition-colors group">
+                  <td className="p-6 text-xs font-bold text-gray-600">#{movie.id}</td>
+                  <td className="p-6">
+                    <div className="w-12 h-16 rounded-lg bg-black border border-white/10 overflow-hidden shadow-lg">
+                      {movie.image ? (
+                        <img 
+                          src={adminImg} 
+                          className="w-full h-full object-cover" 
+                          alt="" 
+                          onError={(e) => {e.target.src = 'https://placehold.jp/24/333333/ffffff/100x150.png?text=No+Img'}}
+                        />
+                      ) : (
+                        <Film size={16} className="m-auto mt-6 text-gray-800" />
+                      )}
+                    </div>
+                  </td>
+                  <td className="p-6">
+                    <div className="font-black text-white text-sm uppercase italic group-hover:text-cyan-400 transition-colors">{movie.title}</div>
+                    <div className="text-[10px] text-gray-500 font-bold mt-1 uppercase tracking-tighter">Tập: {movie.episode_display || 'Chưa cập nhật'}</div>
+                  </td>
+                  <td className="p-6 text-center">
+                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${movie.status === 'Hoàn thành' ? 'bg-green-500/10 text-green-500' : 'bg-orange-500/10 text-orange-500'}`}>
+                      {movie.status}
+                    </span>
+                  </td>
+                  <td className="p-6 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <button className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-all"><Edit2 size={16} /></button>
+                      <button onClick={() => handleDelete(movie.id)} className="p-2 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
+                    </div>
+                  </td>
+                </tr>
+               )
+            })}
           </tbody>
         </table>
       </div>

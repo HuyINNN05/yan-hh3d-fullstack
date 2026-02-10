@@ -12,11 +12,11 @@ function AddEpisode() {
     movie_id: '',
     episode_number: '',
     video_url: '',
-    title: '' 
+    title: '',
+    server_type: 'Thuyết Minh' 
   });
 
   useEffect(() => {
-    // Lấy danh sách phim để sếp chọn phim cần thêm tập
     axios.get('http://localhost:5000/api/admin/movies')
       .then(res => setMovies(res.data))
       .catch(err => console.error("Lỗi lấy danh sách phim:", err));
@@ -28,10 +28,9 @@ function AddEpisode() {
     try {
       await axios.post('http://localhost:5000/api/admin/episodes', episodeData);
       alert("Đã thêm tập phim mới thành công sếp ơi!");
-      // Reset để sếp nhập tập tiếp theo cho nhanh
       setEpisodeData({ ...episodeData, episode_number: parseInt(episodeData.episode_number) + 1, video_url: '', title: '' });
     } catch (err) {
-      alert("Lỗi rồi! Có thể tập này đã tồn tại hoặc server chưa chạy.");
+      alert("Lỗi rồi! Sếp kiểm tra lại Backend hoặc Database nhé.");
     } finally {
       setIsSubmitting(false);
     }
@@ -54,8 +53,6 @@ function AddEpisode() {
 
         <form onSubmit={handleSubmit} className="bg-[#111] border border-white/5 rounded-3xl p-8 relative overflow-hidden shadow-2xl">
           <div className="grid grid-cols-1 gap-8 relative z-10">
-            
-            {/* Chọn bộ phim */}
             <div>
               <label className="text-[10px] font-black text-gray-500 uppercase mb-3 block tracking-widest flex items-center gap-2">
                 <List size={12} /> Bước 1: Chọn bộ phim
@@ -74,7 +71,6 @@ function AddEpisode() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Số tập */}
               <div>
                 <label className="text-[10px] font-black text-orange-500 uppercase mb-3 block flex items-center gap-2">
                   <Hash size={12} /> Bước 2: Số tập
@@ -89,7 +85,6 @@ function AddEpisode() {
                 />
               </div>
 
-              {/* Tên tập */}
               <div>
                 <label className="text-[10px] font-black text-gray-500 uppercase mb-3 block flex items-center gap-2">
                   <Play size={12} /> Tên tập (Tùy chọn)
@@ -104,7 +99,6 @@ function AddEpisode() {
               </div>
             </div>
 
-            {/* Link Video */}
             <div className="bg-cyan-500/5 p-6 rounded-2xl border border-cyan-500/10">
               <label className="text-[10px] font-black text-cyan-400 uppercase mb-3 block flex items-center gap-2">
                 <LinkIcon size={14} /> Bước 3: Link Video (Iframe/URL)
@@ -119,7 +113,6 @@ function AddEpisode() {
               ></textarea>
             </div>
 
-            {/* Nút lưu */}
             <div className="mt-4 pt-6 border-t border-white/5">
               <button 
                 type="submit" 

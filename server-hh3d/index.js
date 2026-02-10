@@ -5,7 +5,6 @@ const cors = require('cors');
 const app = express();
 app.use(cors()); 
 
-// SỬA TẠI ĐÂY: Tăng giới hạn nhận dữ liệu để không bị lỗi khi upload ảnh từ máy tính
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -16,7 +15,7 @@ const db = mysql.createPool({
     database: 'yanhh3d_db'
 });
 
-// --- CÁC API CŨ CỦA BẠN (GIỮ NGUYÊN) ---
+// --- API PHIM ---
 app.get('/api/movies', (req, res) => {
     const sql = "SELECT * FROM movies ORDER BY id DESC";
     db.query(sql, (err, data) => {
@@ -35,9 +34,10 @@ app.get('/api/search', (req, res) => {
     });
 });
 
+// SỬA TẠI ĐÂY: API lấy tập phim cho trang chi tiết
 app.get('/api/episodes/:movieId', (req, res) => {
     const movieId = req.params.movieId;
-    const sql = "SELECT * FROM episodes WHERE movie_id = ? ORDER BY episode_number ASC";
+    const sql = "SELECT * FROM episodes WHERE movie_id = ? ORDER BY CAST(episode_number AS UNSIGNED) ASC";
     db.query(sql, [movieId], (err, data) => {
         if (err) return res.status(500).json(err);
         return res.json(data);
@@ -81,7 +81,7 @@ app.get('/api/categories', (req, res) => {
     });
 });
 
-// --- API AUTH (GIỮ NGUYÊN) ---
+// --- API AUTH ---
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
     const sql = "SELECT id, username, email, role FROM users WHERE email = ? AND password = ?";
@@ -103,7 +103,7 @@ app.post('/api/register', (req, res) => {
     });
 });
 
-// --- API DÀNH CHO ADMIN (CẬP NHẬT ĐỂ NHẬN ĐỦ DATA) ---
+// --- API ADMIN ---
 app.get('/api/admin/movies', (req, res) => {
     const sql = "SELECT movies.*, categories.name AS category_name FROM movies LEFT JOIN categories ON movies.category_id = categories.id ORDER BY id DESC";
     db.query(sql, (err, data) => {
@@ -135,7 +135,6 @@ app.delete('/api/admin/movies/:id', (req, res) => {
     });
 });
 
-// --- THÊM MỚI: API QUẢN LÝ NGƯỜI DÙNG (ADMIN) ---
 app.get('/api/admin/users', (req, res) => {
     const sql = "SELECT id, username, email, role, created_at FROM users ORDER BY id DESC";
     db.query(sql, (err, data) => {
@@ -153,25 +152,21 @@ app.delete('/api/admin/users/:id', (req, res) => {
     });
 });
 
-// --- THÊM MỚI: API QUẢN LÝ TẬP PHIM (ADMIN) ---
-
-// 1. Thêm tập phim mới (Giải quyết lỗi 404 sếp gặp phải)
+// THÊM TẬP PHIM: Dùng dấu huyền để tránh lỗi trùng từ khóa 'title'
 app.post('/api/admin/episodes', (req, res) => {
-    // Bỏ title ra khỏi danh sách nhận và danh sách values
-    const { movie_id, episode_number, video_url, server_type } = req.body;
-    const sql = "INSERT INTO episodes (movie_id, episode_number, video_url, server_type) VALUES (?, ?, ?, ?)";
-    const values = [movie_id, episode_number, video_url, server_type || 'Thuyết Minh'];
+    const { movie_id, episode_number, video_url, server_type, title } = req.body;
+    const sql = "INSERT INTO episodes (`movie_id`, `episode_number`, `video_url`, `server_type`, `title`) VALUES (?, ?, ?, ?, ?)";
+    const values = [movie_id, episode_number, video_url, server_type || 'Thuyết Minh', title || ''];
     
     db.query(sql, values, (err, result) => {
         if (err) {
-            console.error("Lỗi MySQL:", err);
+            console.error("Lỗi MySQL khi thêm tập:", err);
             return res.status(500).json(err);
         }
         return res.json({ message: "Thành công sếp ơi!" });
     });
 });
 
-// 2. Lấy danh sách tập phim để quản lý (Nếu sếp cần)
 app.get('/api/admin/episodes', (req, res) => {
     const sql = `
         SELECT episodes.*, movies.title as movie_title 
@@ -182,6 +177,34 @@ app.get('/api/admin/episodes', (req, res) => {
     db.query(sql, (err, data) => {
         if (err) return res.status(500).json(err);
         return res.json(data);
+    });
+});
+
+// --- API BÌNH LUẬN ---
+app.get('/api/comments/:movieId', (req, res) => {
+    const movieId = req.params.movieId;
+    const sql = `
+        SELECT comments.*, users.username 
+        FROM comments 
+        JOIN users ON comments.user_id = users.id 
+        WHERE comments.movie_id = ? 
+        ORDER BY comments.created_at DESC
+    `;
+    db.query(sql, [movieId], (err, data) => {
+        if (err) return res.status(500).json(err);
+        return res.json(data);
+    });
+});
+
+app.post('/api/comments', (req, res) => {
+    const { user_id, movie_id, content } = req.body;
+    const sql = "INSERT INTO comments (user_id, movie_id, content) VALUES (?, ?, ?)";
+    db.query(sql, [user_id, movie_id, content], (err, result) => {
+        if (err) {
+            console.error("Lỗi lưu bình luận:", err);
+            return res.status(500).json(err);
+        }
+        return res.json({ message: "Đã đăng bình luận!" });
     });
 });
 
