@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Environment Variables - KHÔNG được push lên GitHub
+.env
+.env.*
+
+# Temp / generated files
+*.sql.bak
+yanhh3d_db_clean.sql
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

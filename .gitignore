@@ -1,0 +1,9 @@
+# Temp / generated files
+db_check.txt
+import_err.txt
+*.sql.bak
+*_clean.sql
+
+# OS
+.DS_Store
+Thumbs.db
