@@ -51,15 +51,15 @@ const findById = async (id) => {
  * Tạo phim mới
  * @param {Object} movieData
  */
-const create = async ({ title, description, image, video_url, category_id, quality, status, episode_display, show_schedule }) => {
+const create = async ({ title, description, image, video_url, category_id, quality, status, episode_display, show_schedule, total_episodes }) => {
     const sql = `
-        INSERT INTO movies (title, description, image, video_url, category_id, quality, status, episode_display, show_schedule)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO movies (title, description, image, video_url, category_id, quality, status, episode_display, show_schedule, total_episodes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await db.query(sql, [
         title, description || null, image || null, video_url || null,
         category_id || null, quality || null, status || null,
-        episode_display || null, show_schedule || null
+        episode_display || null, show_schedule || null, total_episodes || 0
     ]);
     return result.insertId;
 };
@@ -69,16 +69,16 @@ const create = async ({ title, description, image, video_url, category_id, quali
  * @param {number} id
  * @param {Object} movieData
  */
-const update = async (id, { title, description, image, video_url, category_id, quality, status, episode_display, show_schedule }) => {
+const update = async (id, { title, description, image, video_url, category_id, quality, status, episode_display, show_schedule, total_episodes }) => {
     const sql = `
         UPDATE movies
         SET title = ?, description = ?, image = ?, video_url = ?,
-            category_id = ?, quality = ?, status = ?, episode_display = ?, show_schedule = ?
+            category_id = ?, quality = ?, status = ?, episode_display = ?, show_schedule = ?, total_episodes = ?
         WHERE id = ?
     `;
     const [result] = await db.query(sql, [
         title, description, image, video_url,
-        category_id, quality, status, episode_display, show_schedule, id
+        category_id, quality, status, episode_display, show_schedule, total_episodes, id
     ]);
     return result.affectedRows;
 };

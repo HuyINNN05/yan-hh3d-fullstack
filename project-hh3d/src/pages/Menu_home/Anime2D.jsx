@@ -9,7 +9,7 @@ function Anime2D() {
 
   useEffect(() => {
     // Gọi API theo ID thể loại 7 (Là Anime 2D trong database của bạn)
-    axios.get('http://localhost:5000/api/movies/category/7')
+    axios.get(`${import.meta.env.VITE_API_URL || ''}/api/movies/category/7`)
       .then(res => {
         setMovies(res.data);
         setLoading(false);

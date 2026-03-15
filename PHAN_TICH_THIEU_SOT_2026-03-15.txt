@@ -1,0 +1,119 @@
+PHAN TICH THIEU SOT DU AN HH3D
+Ngay kiem tra: 2026-03-15
+Nguoi kiem tra: GitHub Copilot
+
+==================================================
+1) KET QUA CHAY THUC TE
+==================================================
+Da chay bang Docker Compose tai thu muc C:\IT.
+Trang thai services:
+- db: Up (healthy) | port host 3307 -> container 3306
+- backend: Up (healthy) | port host 5000 -> container 5000
+- frontend: Up (unhealthy) | port host 3000 -> container 80
+
+Kiem tra endpoint:
+- http://localhost:5000/health => 200 OK
+- http://localhost:3000 => 200 OK
+
+Nhan xet:
+- Ung dung van truy cap duoc o localhost:3000 va backend hoat dong.
+- Frontend bi danh dau "unhealthy" do healthcheck sai, khong phai do app sap.
+
+==================================================
+2) CAC DIEM THIEU SOT / CAN UPDATE
+==================================================
+[MUC DO CAO] Frontend healthcheck sai localhost
+- Vi tri: project-hh3d/Dockerfile (dong HEALTHCHECK)
+- Hien tai: wget http://localhost/
+- Trieu chung: Docker health log bao "wget: can't connect to remote host: Connection refused"
+- Kiem tra lai: dung http://127.0.0.1:80/ trong container thi thanh cong.
+- Tac dong: service frontend luon unhealthy, anh huong monitor/CD.
+- De xuat sua:
+  HEALTHCHECK ... CMD wget --quiet --tries=1 --spider http://127.0.0.1:80/ || exit 1
+
+[MUC DO TRUNG BINH] docker-compose.yml dung key version da obsolete
+- Vi tri: docker-compose.yml
+- Canh bao khi chay: "attribute version is obsolete"
+- Tac dong: khong gay sap, nhung tao warning va de gay nham.
+- De xuat: xoa dong version: "3.8".
+
+[MUC DO TRUNG BINH] Backend thieu file .env.example (tai lieu khong khop thuc te)
+- Vi tri tai lieu: README.md huong dan "cp .env.example .env"
+- Thuc te: server-hh3d khong co .env.example
+- Tac dong: nguoi moi setup de bi dung.
+- De xuat: tao server-hh3d/.env.example voi bien toi thieu:
+  DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, PORT, JWT_SECRET, JWT_EXPIRES_IN, BCRYPT_ROUNDS
+
+[MUC DO TRUNG BINH] Secret dang hard-code trong docker-compose
+- Vi tri: docker-compose.yml (JWT_SECRET)
+- Tac dong: risk bao mat khi day code len remote/public.
+- De xuat: dua vao file .env ngoai root hoac Docker secrets.
+
+[MUC DO THAP] dotenv dang log 2 lan khi backend khoi dong
+- Vi tri: server-hh3d/index.js va server-hh3d/config/db.js deu goi dotenv.config
+- Tac dong: log nhieu, kho debug.
+- De xuat: chi giu 1 diem nap bien moi truong.
+
+[MUC DO THAP] Kiem thu tu dong chua co
+- Vi tri: server-hh3d/package.json test script hien tai la placeholder
+- Tac dong: kho dam bao chat luong khi update.
+- De xuat: them smoke test cho /health, /api/movies, dang nhap.
+
+[MUC DO CAO] Tai khoan test trong README khong khop du lieu DB seed
+- Vi tri: README.md (muc Tai Khoan Test) va server-hh3d/yanhh3d_db.sql
+- Trieu chung: dang nhap admin@hh3d.com / Admin@123 bi 401 Unauthorized.
+- Du lieu DB hien co:
+  admin@yanhh3d.gg / admin123456 (role admin)
+  user@gmail.com / 123456 (role user)
+- Tac dong: tester khong dang nhap duoc theo huong dan tai lieu.
+- De xuat:
+  1) cap nhat README theo du lieu seed thuc te, hoac
+  2) bo sung script seed/add-admin chay tu dong khi khoi tao DB.
+
+[MUC DO TRUNG BINH] Du lieu mau co ban ghi image base64 rat lon trong bang movies
+- Vi tri: server-hh3d/yanhh3d_db.sql (ban ghi id=27)
+- Trieu chung: truong image chua chuoi data:image/... rat dai.
+- Tac dong:
+  - file SQL nang va kho bao tri
+  - import DB cham hon
+  - memory/network cost tang khi tra API
+- De xuat: luu duong dan file anh (URL/path) thay vi nhung base64 truc tiep vao DB.
+
+==================================================
+3) LUU Y MOI TRUONG MAY BAN
+==================================================
+- Ban da tat MySQL local la dung de tranh trung cong 3306.
+- Docker DB dang map ra host 3307 nen khong can bat MySQL local.
+- Apache dang bat khong anh huong truc tiep vi frontend dang dung cong 3000.
+
+==================================================
+4) GOI Y THU TU UPDATE NHANH
+==================================================
+1. Sua HEALTHCHECK frontend sang 127.0.0.1
+2. Xoa key version trong docker-compose
+3. Dong bo lai tai khoan test trong README voi DB seed
+4. Tao server-hh3d/.env.example + cap nhat README
+5. Dua JWT_SECRET ra bien moi truong
+6. Loai bo image base64 lon khoi SQL seed
+7. Bo sung test smoke co ban
+
+==================================================
+5) LENH KIEM TRA NHANH SAU KHI SUA
+==================================================
+- docker-compose down
+- docker-compose up --build -d
+- docker-compose ps
+- docker inspect --format "{{json .State.Health}}" hh3d-frontend
+- mo trinh duyet: http://localhost:3000
+
+==================================================
+6) THONG TIN TEST NHANH CHO BAN (DA XAC MINH)
+==================================================
+- URL frontend: http://localhost:3000
+- URL backend health: http://localhost:5000/health
+- Tai khoan admin dang dung duoc: admin@yanhh3d.gg / admin123456
+- Tai khoan user dang dung duoc: user@gmail.com / 123456
+
+Luu y:
+- Frontend van mo duoc de test du bi danh dau "health: starting/unhealthy".
+- Nguyen nhan chinh la lenh healthcheck trong container frontend.

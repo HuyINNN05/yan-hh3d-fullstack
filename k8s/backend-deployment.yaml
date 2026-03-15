@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels:
+    app: hh3d-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hh3d-backend
+  template:
+    metadata:
+      labels:
+        app: hh3d-backend
+    spec:
+      containers:
+        - name: backend
+          image: hh3d-backend:latest
+          imagePullPolicy: Never # Dùng image local trên Minikube
+          ports:
+            - containerPort: 5000
+          env:
+            - name: DB_HOST
+              value: "db-service"
+            - name: DB_USER
+              value: "root"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: password
+            - name: DB_NAME
+              value: "yanhh3d_db"
+            - name: UPLOAD_DIR
+              value: "/app/uploads/image"
+            - name: PORT
+              value: "5000"
+          volumeMounts:
+            - name: upload-storage
+              mountPath: /app/uploads/image
+      volumes:
+        - name: upload-storage
+          persistentVolumeClaim:
+            claimName: upload-pvc

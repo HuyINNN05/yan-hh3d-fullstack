@@ -18,7 +18,7 @@ function Sidebar({ isOpen, onClose }) {
 
   // Gọi API lấy danh sách thể loại (Giữ nguyên logic của bạn)
   useEffect(() => {
-    axios.get('http://localhost:5000/api/categories')
+    axios.get(`${import.meta.env.VITE_API_URL || ''}/api/categories`)
       .then(res => {
         setCategories(res.data);
       })

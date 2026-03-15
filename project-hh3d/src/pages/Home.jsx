@@ -1,200 +1,122 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { fetchMovies } from '../api/movieApi';
+import { Link } from 'react-router-dom';
+import axios from 'axios';
+import Slider from '../components/Slider';
+import MovieList from '../components/MovieList';
 import MovieCard from '../components/MovieCard';
+import MovieCardSkeleton from '../components/MovieCardSkeleton';
 import Pagination from '../components/Pagination';
-import { Search, SlidersHorizontal, TrendingUp, X } from 'lucide-react';
 
-const GENRES = ['', 'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror', 'Romance', 'Sci-Fi', 'Thriller'];
-const SORTS  = [
-    { value: '',           label: 'Má»›i nháº¥t' },
-    { value: 'views',      label: 'LÆ°á»£t xem' },
-    { value: 'title',      label: 'TÃªn A-Z' },
-];
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 24;
+const API = import.meta.env.VITE_API_URL || '';
 
-const Home = () => {
-    const [searchParams, setSearchParams] = useSearchParams();
+export default function Home() {
+  const [searchParams] = useSearchParams();
+  const search = searchParams.get('search') || '';
+  const sort   = searchParams.get('sort')   || '';
+  const category = searchParams.get('category') || '';
+  const status = searchParams.get('status') || '';
 
-    const [search, setSearch] = useState(searchParams.get('search') || '');
-    const [genre,  setGenre]  = useState(searchParams.get('genre')  || '');
-    const [sort,   setSort]   = useState(searchParams.get('sort')   || '');
-    const [page,   setPage]   = useState(1);
+  const [movies, setMovies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
-    const [movies,       setMovies]       = useState([]);
-    const [totalMovies,  setTotalMovies]  = useState(0);
-    const [loading,      setLoading]      = useState(false);
-    const [error,        setError]        = useState('');
-    const [searchInput,  setSearchInput]  = useState(search);
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        let url;
+        if (category) url = `${API}/api/movies/category/${category}`;
+        else if (search) url = `${API}/api/search?q=${encodeURIComponent(search)}&limit=200`;
+        else url = `${API}/api/movies`;
 
-    const totalPages = Math.ceil(totalMovies / PAGE_SIZE);
+        const res = await axios.get(url);
+        let data = Array.isArray(res.data) ? res.data : (res.data.data || []);
 
-    // Gá»i API má»—i khi filter/page thay Ä‘á»•i
-    const loadMovies = useCallback(async () => {
-        setLoading(true);
-        setError('');
-        try {
-            const res  = await fetchMovies({ search, genre, sort });
-            const all  = res.data.data || [];
-            setTotalMovies(all.length);
-            const start = (page - 1) * PAGE_SIZE;
-            setMovies(all.slice(start, start + PAGE_SIZE));
-        } catch (err) {
-            setError(err.response?.data?.message || 'KhÃ´ng thá»ƒ táº£i danh sÃ¡ch phim. Vui lÃ²ng thá»­ láº¡i.');
-        } finally {
-            setLoading(false);
-        }
-    }, [search, genre, sort, page]);
+        if (status) data = data.filter(m => m.status === status);
+        if (sort === 'views') data.sort((a, b) => (b.views || 0) - (a.views || 0));
+        else if (sort === 'created_at') data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    useEffect(() => {
-        loadMovies();
-    }, [loadMovies]);
-
-    // Äá»“ng bá»™ state search tá»« URL (khi navigate tá»« Navbar)
-    useEffect(() => {
-        const s = searchParams.get('search') || '';
-        setSearch(s);
-        setSearchInput(s);
+        setMovies(data);
         setPage(1);
-    }, [searchParams]);
-
-    const handleSearchSubmit = (e) => {
-        e.preventDefault();
-        setSearch(searchInput.trim());
-        setPage(1);
-        const params = {};
-        if (searchInput.trim()) params.search = searchInput.trim();
-        if (genre) params.genre = genre;
-        if (sort)  params.sort  = sort;
-        setSearchParams(params);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (e) {
+        console.error(e);
+        setMovies([]);
+      } finally {
+        setLoading(false);
+      }
     };
+    fetchData();
+  }, [search, sort, category, status]);
 
-    const handleGenreChange = (g) => { setGenre(g); setPage(1); };
-    const handleSortChange  = (s) => { setSort(s);  setPage(1); };
+  const isFiltered = !!(search || sort || category || status);
 
-    const clearFilters = () => {
-        setSearch(''); setSearchInput(''); setGenre(''); setSort(''); setPage(1);
-        setSearchParams({});
-    };
+  const newest   = useMemo(() => [...movies].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 12), [movies]);
+  const topViews = useMemo(() => [...movies].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 12), [movies]);
 
-    const hasFilters = search || genre || sort;
+  const totalPages = Math.ceil(movies.length / PAGE_SIZE);
+  const paginated  = movies.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-    return (
-        <div className="min-h-screen bg-[#0f0f0f] text-white">
-            <div className="max-w-7xl mx-auto px-4 py-8">
+  const pageTitle = () => {
+    if (search)  return `Kết quả: "${search}"`;
+    if (sort === 'views')      return 'Top Xem Nhiều';
+    if (sort === 'created_at') return 'Mới Cập Nhật';
+    if (status === 'Completed') return 'Phim Hoàn Thành';
+    if (category) return 'Theo Thể Loại';
+    return null;
+  };
 
-                {/* Hero */}
-                <div className="mb-8 text-center">
-                    <h1 className="text-4xl font-bold text-white mb-2">
-                        <span className="text-purple-400">HH3D</span> â€” Phim Hoáº¡t HÃ¬nh 3D
-                    </h1>
-                    <p className="text-gray-400 text-sm">KhÃ¡m phÃ¡ kho phim hoáº¡t hÃ¬nh 3D cháº¥t lÆ°á»£ng cao</p>
+  return (
+    <div className="min-h-screen bg-[#0d1117] pt-14 md:pt-16">
+      {!isFiltered && !loading && <Slider movies={newest} />}
+
+      <div className="max-w-7xl mx-auto px-4">
+        {!isFiltered ? (
+          <div className="pt-8 space-y-2">
+            <MovieList title="Mới Cập Nhật" movies={newest} loading={loading} moreLink="/?sort=created_at" />
+            <MovieList title="Xem Nhiều Nhất" movies={topViews} loading={loading} moreLink="/?sort=views" />
+          </div>
+        ) : (
+          <div className="pt-8">
+            {pageTitle() && (
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-1 h-6 bg-orange-500 rounded-full" />
+                <h1 className="text-white font-bold text-xl">{pageTitle()}</h1>
+                {!loading && (
+                  <span className="text-gray-500 text-sm ml-1">({movies.length} phim)</span>
+                )}
+              </div>
+            )}
+
+            {!loading && movies.length === 0 ? (
+              <div className="flex flex-col items-center py-24 text-gray-600">
+                <svg className="w-20 h-20 mb-4 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                    d="M7 4v16M17 4v16M3 8h4m10 0h4M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                </svg>
+                <p className="text-lg font-medium text-gray-500">Không tìm thấy phim nào</p>
+                {search && <p className="text-sm mt-1 text-gray-600">Thử tìm kiếm với từ khóa khác nhé!</p>}
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+                  {loading
+                    ? Array.from({ length: 12 }).map((_, i) => <MovieCardSkeleton key={i} />)
+                    : paginated.map(m => <MovieCard key={m.id} movie={m} />)
+                  }
                 </div>
-
-                {/* Search + Filters */}
-                <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-5 mb-8">
-                    <form onSubmit={handleSearchSubmit} className="flex gap-3 mb-4">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                            <input
-                                type="text"
-                                value={searchInput}
-                                onChange={e => setSearchInput(e.target.value)}
-                                placeholder="TÃ¬m kiáº¿m tÃªn phim..."
-                                className="w-full bg-[#2a2a2a] text-white placeholder-gray-500 pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            />
-                        </div>
-                        <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition">
-                            TÃ¬m
-                        </button>
-                    </form>
-
-                    <div className="flex flex-wrap gap-3 items-center">
-                        <div className="flex items-center gap-2 text-gray-400 text-sm">
-                            <SlidersHorizontal size={16} /><span>Thá»ƒ loáº¡i:</span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {GENRES.map(g => (
-                                <button
-                                    key={g}
-                                    onClick={() => handleGenreChange(g)}
-                                    className={`px-3 py-1 rounded-full text-xs border transition ${
-                                        genre === g
-                                            ? 'bg-purple-600 border-purple-600 text-white'
-                                            : 'border-gray-700 text-gray-400 hover:border-purple-500 hover:text-gray-200'
-                                    }`}
-                                >{g || 'Táº¥t cáº£'}</button>
-                            ))}
-                        </div>
-                        <div className="flex items-center gap-2 ml-auto">
-                            <TrendingUp size={16} className="text-gray-400" />
-                            <select
-                                value={sort}
-                                onChange={e => handleSortChange(e.target.value)}
-                                className="bg-[#2a2a2a] text-gray-300 text-sm border border-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            >
-                                {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                            </select>
-                        </div>
-                        {hasFilters && (
-                            <button onClick={clearFilters} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition">
-                                <X size={14} /> XÃ³a lá»c
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Results info */}
-                {!loading && !error && (
-                    <p className="text-gray-500 text-sm mb-4">
-                        {search && <span>Káº¿t quáº£ cho "<span className="text-purple-400">{search}</span>" â€” </span>}
-                        <span className="text-gray-400">{totalMovies}</span> phim tÃ¬m tháº¥y
-                    </p>
-                )}
-
-                {/* Loading skeleton */}
-                {loading && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        {Array.from({ length: 12 }).map((_, i) => (
-                            <div key={i} className="bg-[#1a1a1a] rounded-xl overflow-hidden animate-pulse">
-                                <div className="aspect-[2/3] bg-gray-800" />
-                                <div className="p-3 space-y-2">
-                                    <div className="h-3 bg-gray-700 rounded w-3/4" />
-                                    <div className="h-2 bg-gray-800 rounded w-1/2" />
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* Error */}
-                {!loading && error && (
-                    <div className="text-center py-20">
-                        <p className="text-red-400 text-lg mb-4">{error}</p>
-                        <button onClick={loadMovies} className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-xl transition">Thá»­ láº¡i</button>
-                    </div>
-                )}
-
-                {/* Empty */}
-                {!loading && !error && movies.length === 0 && (
-                    <div className="text-center py-20">
-                        <p className="text-gray-500 text-lg mb-2">KhÃ´ng tÃ¬m tháº¥y phim nÃ o.</p>
-                        {hasFilters && <button onClick={clearFilters} className="text-purple-400 hover:text-purple-300 text-sm transition">XÃ³a bá»™ lá»c</button>}
-                    </div>
-                )}
-
-                {/* Grid */}
-                {!loading && !error && movies.length > 0 && (
-                    <>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                            {movies.map(movie => <MovieCard key={movie.id} movie={movie} />)}
-                        </div>
-                        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
-                    </>
-                )}
-            </div>
-        </div>
-    );
-};
-
-export default Home;
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  onPageChange={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                />
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

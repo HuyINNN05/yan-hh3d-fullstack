@@ -1,45 +1,41 @@
 import React from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
-
-// Layout components
-import Navbar       from './components/Navbar';
-import PrivateRoute from './components/PrivateRoute';
-import AdminRoute   from './components/AdminRoute';
-
-// Public pages
-import Home     from './pages/Home';
-import Detail   from './pages/Detail';
-import Login    from './pages/login';
+import Navbar from './components/Navbar';
+import Home from './pages/Home';
+import Detail from './pages/Detail';
+import Login from './pages/Login';
 import Register from './pages/Register';
-
-// Admin pages
 import Dashboard from './pages/Admin/Dashboard';
+import AdminMovies from './pages/Admin/AdminMovies';
+import AddMovie from './pages/Admin/AddMovie';
+import AddEpisode from './pages/Admin/AddEpisode';
+import EpisodeManager from './pages/Admin/EpisodeManager';
+import AdminUsers from './pages/Admin/AdminUsers';
 
-function App() {
-    const location = useLocation();
-    const isAdminPage = location.pathname.startsWith('/admin');
-
-    return (
-        <div className="min-h-screen bg-[#0f0f0f]">
-            {/* Show Navbar only outside admin section */}
-            {!isAdminPage && <Navbar />}
-
-            <Routes>
-                {/* Public */}
-                <Route path="/"          element={<Home />} />
-                <Route path="/movie/:id" element={<Detail />} />
-                <Route path="/login"     element={<Login />} />
-                <Route path="/register"  element={<Register />} />
-
-                {/* Admin (requires login + admin role) */}
-                <Route path="/admin" element={
-                    <AdminRoute>
-                        <Dashboard />
-                    </AdminRoute>
-                } />
-            </Routes>
-        </div>
-    );
+function AdminRoute({ children }) {
+  const user = (() => { try { return JSON.parse(localStorage.getItem('user')); } catch { return null; } })();
+  if (!user || user.role !== 'admin') { window.location.href = '/'; return null; }
+  return children;
 }
 
-export default App;
+export default function App() {
+  const location = useLocation();
+  const isAdmin = location.pathname.startsWith('/admin');
+  return (
+    <>
+      {!isAdmin && <Navbar />}
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/movie/:id" element={<Detail />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/admin" element={<AdminRoute><Dashboard /></AdminRoute>} />
+        <Route path="/admin/movies" element={<AdminRoute><AdminMovies /></AdminRoute>} />
+        <Route path="/admin/movies/add" element={<AdminRoute><AddMovie /></AdminRoute>} />
+        <Route path="/admin/episodes/:movieId" element={<AdminRoute><EpisodeManager /></AdminRoute>} />
+        <Route path="/admin/episodes/add" element={<AdminRoute><AddEpisode /></AdminRoute>} />
+        <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+      </Routes>
+    </>
+  );
+}

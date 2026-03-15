@@ -7,8 +7,8 @@ const { successResponse, errorResponse } = require('../utils/responseHelper');
  */
 const getAllMovies = async (req, res, next) => {
     try {
-        const { search, genre, sort } = req.query;
-        const movies = await MovieModel.findAll({ search, genre, sort });
+        const { search, category_id, sort } = req.query;
+        const movies = await MovieModel.findAll({ search, category_id, sort });
         return successResponse(res, 200, 'Lấy danh sách phim thành công', movies);
     } catch (err) {
         next(err);
@@ -43,13 +43,13 @@ const getMovieById = async (req, res, next) => {
  */
 const createMovie = async (req, res, next) => {
     try {
-        const { title, description, image, video_url, category_id, quality, status, episode_display, show_schedule } = req.body;
+        const { title, description, image, video_url, category_id, quality, status, episode_display, show_schedule, total_episodes } = req.body;
 
         if (!title) {
             return errorResponse(res, 400, 'Thiếu dữ liệu bắt buộc: title');
         }
 
-        const newId = await MovieModel.create({ title, description, image, video_url, category_id, quality, status, episode_display, show_schedule });
+        const newId = await MovieModel.create({ title, description, image, video_url, category_id, quality, status, episode_display, show_schedule, total_episodes });
         const newMovie = await MovieModel.findById(newId);
 
         return successResponse(res, 201, 'Thêm phim thành công', newMovie);
@@ -65,7 +65,7 @@ const createMovie = async (req, res, next) => {
 const updateMovie = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { title, description, image, video_url, category_id, quality, status, episode_display, show_schedule } = req.body;
+        const { title, description, image, video_url, category_id, quality, status, episode_display, show_schedule, total_episodes } = req.body;
 
         // Kiểm tra phim tồn tại
         const existing = await MovieModel.findById(id);
@@ -84,6 +84,7 @@ const updateMovie = async (req, res, next) => {
             status:           status           ?? existing.status,
             episode_display:  episode_display  ?? existing.episode_display,
             show_schedule:    show_schedule    ?? existing.show_schedule,
+            total_episodes:   total_episodes   ?? existing.total_episodes,
         });
 
         const updatedMovie = await MovieModel.findById(id);

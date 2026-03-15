@@ -1,8 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axiosInstance from '../../api/axiosInstance';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../../compoment/AdminLayout';
 import { Save, X, Play, List, Link as LinkIcon, Hash, ArrowLeft } from 'lucide-react';
+
+// Tự động chuyển YouTube/GDrive URL sang dạng embed
+function toEmbedUrl(url) {
+  if (!url) return '';
+  
+  // Nếu đã là embed URL rồi, trả về luôn
+  if (url.includes('youtube.com/embed/')) {
+    // Remove any parameters from embed URLs
+    return url.split('&')[0];
+  }
+  if (url.includes('drive.google.com/file/')) return url;
+  
+  // Kiểm tra YouTube full URL: https://www.youtube.com/watch?v=ID hoặc https://youtube.com/watch?v=ID
+  const ytWatch = url.match(/(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/);
+  if (ytWatch && ytWatch[1]) return `https://www.youtube.com/embed/${ytWatch[1]}`;
+  
+  // Kiểm tra YouTube short URL: https://youtu.be/ID
+  const ytShort = url.match(/(?:https?:\/\/)?youtu\.be\/([a-zA-Z0-9_-]+)/);
+  if (ytShort && ytShort[1]) return `https://www.youtube.com/embed/${ytShort[1]}`;
+  
+  // Kiểm tra nếu là chỉ video ID (11 ký tự alphanumeric)
+  if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return `https://www.youtube.com/embed/${url}`;
+  
+  // Kiểm tra Google Drive
+  const gdrive = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (gdrive && gdrive[1]) return `https://drive.google.com/file/d/${gdrive[1]}/preview`;
+  
+  return url;
+}
 
 function AddEpisode() {
   const navigate = useNavigate();
@@ -17,8 +46,8 @@ function AddEpisode() {
   });
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/admin/movies')
-      .then(res => setMovies(res.data))
+    axiosInstance.get('/admin/movies')
+      .then(res => setMovies(Array.isArray(res.data) ? res.data : []))
       .catch(err => console.error("Lỗi lấy danh sách phim:", err));
   }, []);
 
@@ -26,7 +55,7 @@ function AddEpisode() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await axios.post('http://localhost:5000/api/admin/episodes', episodeData);
+      await axiosInstance.post('/admin/episodes', episodeData);
       alert("Đã thêm tập phim mới thành công sếp ơi!");
       setEpisodeData({ ...episodeData, episode_number: parseInt(episodeData.episode_number) + 1, video_url: '', title: '' });
     } catch (err) {
@@ -54,7 +83,7 @@ function AddEpisode() {
         <form onSubmit={handleSubmit} className="bg-[#111] border border-white/5 rounded-3xl p-8 relative overflow-hidden shadow-2xl">
           <div className="grid grid-cols-1 gap-8 relative z-10">
             <div>
-              <label className="text-[10px] font-black text-gray-500 uppercase mb-3 block tracking-widest flex items-center gap-2">
+              <label className="text-[10px] font-black text-gray-500 uppercase mb-3 tracking-widest flex items-center gap-2">
                 <List size={12} /> Bước 1: Chọn bộ phim
               </label>
               <select 
@@ -72,7 +101,7 @@ function AddEpisode() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
-                <label className="text-[10px] font-black text-orange-500 uppercase mb-3 block flex items-center gap-2">
+                <label className="text-[10px] font-black text-orange-500 uppercase mb-3 flex items-center gap-2">
                   <Hash size={12} /> Bước 2: Số tập
                 </label>
                 <input 
@@ -86,7 +115,7 @@ function AddEpisode() {
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-gray-500 uppercase mb-3 block flex items-center gap-2">
+                <label className="text-[10px] font-black text-gray-500 uppercase mb-3 flex items-center gap-2">
                   <Play size={12} /> Tên tập (Tùy chọn)
                 </label>
                 <input 
@@ -100,16 +129,16 @@ function AddEpisode() {
             </div>
 
             <div className="bg-cyan-500/5 p-6 rounded-2xl border border-cyan-500/10">
-              <label className="text-[10px] font-black text-cyan-400 uppercase mb-3 block flex items-center gap-2">
+              <label className="text-[10px] font-black text-cyan-400 uppercase mb-3 flex items-center gap-2">
                 <LinkIcon size={14} /> Bước 3: Link Video (Iframe/URL)
               </label>
               <textarea 
                 required 
                 rows="3"
                 className="w-full bg-black border border-cyan-500/20 rounded-xl py-4 px-5 text-cyan-100 focus:border-cyan-500 outline-none font-mono text-xs transition-all"
-                placeholder="Dán mã nhúng hoặc link video tập này..."
+                placeholder="YouTube, Google Drive... (tự động convert sang embed)"
                 value={episodeData.video_url}
-                onChange={(e) => setEpisodeData({...episodeData, video_url: e.target.value})}
+                onChange={(e) => setEpisodeData({...episodeData, video_url: toEmbedUrl(e.target.value)})}
               ></textarea>
             </div>
 

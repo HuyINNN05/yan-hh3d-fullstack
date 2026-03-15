@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: hh3d-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hh3d-frontend
+  template:
+    metadata:
+      labels:
+        app: hh3d-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: hh3d-frontend:latest
+          imagePullPolicy: Never # Dùng image local trên Minikube
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: frontend-nginx-config

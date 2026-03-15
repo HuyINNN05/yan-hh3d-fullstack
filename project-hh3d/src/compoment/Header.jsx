@@ -35,7 +35,7 @@ function Header({ onOpenMenu }) {
       }
 
       // API này yêu cầu bạn đã cập nhật file index.js (backend)
-      axios.get(`http://localhost:5000/api/search?q=${searchTerm}`)
+      axios.get(`${import.meta.env.VITE_API_URL || ''}/api/search?q=${searchTerm}`)
         .then(res => {
           setSearchResults(res.data.slice(0, 5));
         })

@@ -1,89 +1,160 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { Film, Mail, Lock, UserPlus, Eye, EyeOff } from 'lucide-react';
+import axios from 'axios';
+import { User, Mail, Lock, UserPlus, Film, Eye, EyeOff } from 'lucide-react';
 
-const Register = () => {
-    const { register } = useAuth();
-    const navigate     = useNavigate();
+const API = import.meta.env.VITE_API_URL || '';
 
-    const [email,    setEmail]    = useState('');
-    const [password, setPassword] = useState('');
-    const [confirm,  setConfirm]  = useState('');
-    const [showPass, setShowPass] = useState(false);
-    const [loading,  setLoading]  = useState(false);
-    const [error,    setError]    = useState('');
-    const [success,  setSuccess]  = useState('');
+export default function Register() {
+  const navigate = useNavigate();
+  const [form, setForm] = useState({ username: '', email: '', password: '', confirm: '' });
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
-        if (password !== confirm) return setError('Mật khẩu xác nhận không khớp.');
-        if (password.length < 6) return setError('Mật khẩu phải có ít nhất 6 ký tự.');
-        setLoading(true);
-        try {
-            await register(email.trim(), password);
-            setSuccess('Đăng ký thành công! Đang chuyển đến trang đăng nhập...');
-            setTimeout(() => navigate('/login'), 1500);
-        } catch (err) {
-            setError(err.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.');
-        } finally {
-            setLoading(false);
-        }
-    };
+  const handleChange = (e) => {
+    setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+    setError('');
+  };
 
-    return (
-        <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center px-4">
-            <div className="w-full max-w-sm">
-                <Link to="/" className="flex items-center justify-center gap-2 text-purple-400 font-bold text-2xl mb-8">
-                    <Film size={28} /> HH3D
-                </Link>
-                <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-8">
-                    <h2 className="text-white text-xl font-bold mb-6 text-center">Tạo tài khoản</h2>
-                    {error && <div className="bg-red-500/10 border border-red-500/40 text-red-400 text-sm px-4 py-3 rounded-xl mb-5">{error}</div>}
-                    {success && <div className="bg-green-500/10 border border-green-500/40 text-green-400 text-sm px-4 py-3 rounded-xl mb-5">{success}</div>}
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-gray-400 text-sm mb-1.5">Email</label>
-                            <div className="relative">
-                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                                <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="example@email.com"
-                                    className="w-full bg-[#2a2a2a] text-white placeholder-gray-600 pl-9 pr-4 py-2.5 rounded-xl text-sm border border-gray-700 focus:outline-none focus:border-purple-500 transition" />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-gray-400 text-sm mb-1.5">Mật khẩu</label>
-                            <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                                <input type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required placeholder="Ít nhất 6 ký tự"
-                                    className="w-full bg-[#2a2a2a] text-white placeholder-gray-600 pl-9 pr-10 py-2.5 rounded-xl text-sm border border-gray-700 focus:outline-none focus:border-purple-500 transition" />
-                                <button type="button" onClick={() => setShowPass(v => !v)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition">
-                                    {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
-                                </button>
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-gray-400 text-sm mb-1.5">Xác nhận mật khẩu</label>
-                            <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                                <input type={showPass ? 'text' : 'password'} value={confirm} onChange={e => setConfirm(e.target.value)} required placeholder="Nhập lại mật khẩu"
-                                    className="w-full bg-[#2a2a2a] text-white placeholder-gray-600 pl-9 pr-4 py-2.5 rounded-xl text-sm border border-gray-700 focus:outline-none focus:border-purple-500 transition" />
-                            </div>
-                        </div>
-                        <button type="submit" disabled={loading || !!success}
-                            className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition mt-2">
-                            {loading ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><UserPlus size={16} /> Đăng ký</>}
-                        </button>
-                    </form>
-                    <p className="text-center text-gray-500 text-sm mt-5">
-                        Đã có tài khoản?{' '}
-                        <Link to="/login" className="text-purple-400 hover:text-purple-300 transition font-medium">Đăng nhập</Link>
-                    </p>
-                </div>
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!form.username || !form.email || !form.password) { 
+      setError('Vui lòng điền đầy đủ thông tin.'); 
+      return; 
+    }
+    
+    if (form.password.length < 6) { 
+      setError('Mật khẩu phải có ít nhất 6 ký tự.'); 
+      return; 
+    }
+    
+    if (form.password !== form.confirm) { 
+      setError('Mật khẩu xác nhận không khớp.'); 
+      return; 
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      const res = await axios.post(`${API}/api/register`, {
+        username: form.username,
+        email: form.email,
+        password: form.password,
+        confirmPassword: form.confirm,
+      });
+      
+      if (res.status === 201 || res.data?.message) {
+        setSuccess(true);
+        setTimeout(() => navigate('/login'), 2000);
+      }
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'Đăng ký thất bại. Email hoặc username có thể đã tồn tại.';
+      setError(errorMsg);
+      console.error('Register error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0d1117] flex items-center justify-center px-4 pt-14 md:pt-16">
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-8">
+          <Link to="/" className="flex items-center gap-2 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center shadow-lg shadow-orange-900/50">
+              <Film size={20} className="text-white" />
             </div>
+            <span className="text-white font-extrabold text-xl tracking-wide">
+              Yan<span className="text-orange-400">HH3D</span>
+            </span>
+          </Link>
+          <p className="text-gray-500 text-sm">Tạo tài khoản mới</p>
         </div>
-    );
-};
 
-export default Register;
+        {/* Card */}
+        <div className="bg-[#111827] border border-gray-800/60 rounded-2xl p-6 shadow-2xl shadow-black/60">
+          <h2 className="text-white text-xl font-bold mb-5 text-center">Đăng ký</h2>
+
+          {success && (
+            <div className="bg-green-500/10 border border-green-500/30 text-green-400 text-sm rounded-xl px-4 py-3 mb-4 text-center">
+              ✓ Đăng ký thành công! Đang chuyển hướng...
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl px-4 py-3 mb-4">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-gray-400 text-xs font-medium mb-1.5">Tên người dùng</label>
+              <div className="relative">
+                <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input type="text" name="username" value={form.username} onChange={handleChange}
+                  placeholder="username" autoComplete="username"
+                  className="w-full bg-[#1c2333] border border-gray-700/60 text-white text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none focus:border-orange-500 transition-colors placeholder-gray-600" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-gray-400 text-xs font-medium mb-1.5">Email</label>
+              <div className="relative">
+                <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input type="email" name="email" value={form.email} onChange={handleChange}
+                  placeholder="your@email.com" autoComplete="email"
+                  className="w-full bg-[#1c2333] border border-gray-700/60 text-white text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none focus:border-orange-500 transition-colors placeholder-gray-600" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-gray-400 text-xs font-medium mb-1.5">Mật khẩu</label>
+              <div className="relative">
+                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input type={showPw ? 'text' : 'password'} name="password" value={form.password} onChange={handleChange}
+                  placeholder="Ít nhất 6 ký tự" autoComplete="new-password"
+                  className="w-full bg-[#1c2333] border border-gray-700/60 text-white text-sm rounded-xl pl-10 pr-10 py-2.5 outline-none focus:border-orange-500 transition-colors placeholder-gray-600" />
+                <button type="button" onClick={() => setShowPw(v => !v)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors">
+                  {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-gray-400 text-xs font-medium mb-1.5">Xác nhận mật khẩu</label>
+              <div className="relative">
+                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input type={showPw ? 'text' : 'password'} name="confirm" value={form.confirm} onChange={handleChange}
+                  placeholder="Nhập lại mật khẩu" autoComplete="new-password"
+                  className="w-full bg-[#1c2333] border border-gray-700/60 text-white text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none focus:border-orange-500 transition-colors placeholder-gray-600" />
+              </div>
+            </div>
+
+            <button type="submit" disabled={loading || success}
+              className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-all shadow-md shadow-orange-900/30 hover:shadow-orange-900/50 mt-2">
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <><UserPlus size={16} /> Tạo tài khoản</>
+              )}
+            </button>
+          </form>
+
+          <div className="mt-5 text-center text-sm text-gray-500">
+            Đã có tài khoản?{' '}
+            <Link to="/login" className="text-orange-400 hover:text-orange-300 font-medium transition-colors">
+              Đăng nhập
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

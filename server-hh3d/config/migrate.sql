@@ -69,6 +69,7 @@ CREATE TABLE `movies` (
   `show_schedule`   VARCHAR(255) DEFAULT NULL,
   `category_id`     INT(11)      DEFAULT NULL,
   `status`          VARCHAR(50)  DEFAULT NULL,
+  `total_episodes`  INT(11)      DEFAULT 0,
   `description`     TEXT         DEFAULT NULL,
   `views`           INT(11)      DEFAULT 0,
   `video_url`       VARCHAR(500) DEFAULT NULL,
@@ -80,33 +81,33 @@ CREATE TABLE `movies` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `movies`
-  (`title`, `episode_display`, `quality`, `image`, `show_schedule`, `category_id`, `status`, `description`, `views`, `video_url`)
+  (`title`, `episode_display`, `quality`, `image`, `show_schedule`, `category_id`, `status`, `total_episodes`, `description`, `views`, `video_url`)
 VALUES
 (
   'Đấu Phá Thương Khung', 'Tập 60', '4K',
   'https://m.media-amazon.com/images/M/MV5BYjc0MjYyN2EtZGRhOS00NmFiLWJlNDYtZTg5MjhhNWZhMjdjXkEyXkFqcGc@._V1_.jpg',
-  'Thứ 2, 4, 6', 4, 'Completed',
+  'Thứ 2, 4, 6', 4, 'Completed', 60,
   'Tiêu Viêm - một thiên tài bị phế bỏ nhưng nhận được sự giúp đỡ bí ẩn, lên đường trở thành Đấu Đế mạnh nhất.',
   125000, 'https://www.youtube.com/embed/dQw4w9WgXcQ'
 ),
 (
   'Toàn Chức Pháp Sư', 'Tập 39', 'FHD',
   'https://upload.wikimedia.org/wikipedia/en/3/3b/Full_Time_Magister_poster.jpg',
-  'Thứ 3, 5, 7', 4, 'Ongoing',
+  'Thứ 3, 5, 7', 4, 'Ongoing', 39,
   'Mặc Phàm xuyên không vào thế giới phép thuật, sở hữu hệ Băng và Hỏa đôi hệ pháp sư.',
   98000, NULL
 ),
 (
   'Hành Tinh Cực Hạn', 'Tập 12', 'HD',
   'https://upload.wikimedia.org/wikipedia/en/thumb/5/59/Planet_With_Volume_1_%28Japanese%29.jpg/220px-Planet_With_Volume_1_%28Japanese%29.jpg',
-  'Thứ 7, CN', 6, 'Completed',
+  'Thứ 7, CN', 6, 'Completed', 12,
   'Cuộc chiến giữa con người và những sinh vật ngoài hành tinh bí ẩn.',
   44000, NULL
 ),
 (
   'Diệt Thần Ký', 'Tập 80', '4K',
   'https://upload.wikimedia.org/wikipedia/en/thumb/5/5e/Dragon_Prince_Yuan_volume_1_cover.png/220px-Dragon_Prince_Yuan_volume_1_cover.png',
-  'Hàng ngày', 2, 'Ongoing',
+  'Hàng ngày', 2, 'Ongoing', 80,
   'Chu Nguyên — hoàng tử bị phế bỏ — vươn lên với sức mạnh thần bí, tìm lại vinh quang.',
   230000, NULL
 );
@@ -120,20 +121,20 @@ CREATE TABLE `episodes` (
   `movie_id`       INT(11)      DEFAULT NULL,
   `episode_number` INT(11)      DEFAULT NULL,
   `video_url`      VARCHAR(500) DEFAULT NULL,
-  `server_type`    VARCHAR(50)  DEFAULT 'Thuyết Minh',
-  `is_end`         TINYINT(1)   DEFAULT 0,
+  `created_at`     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `movie_id` (`movie_id`),
+  UNIQUE KEY `uniq_movie_episode_number` (`movie_id`, `episode_number`),
   CONSTRAINT `episodes_ibfk_1` FOREIGN KEY (`movie_id`)
     REFERENCES `movies` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO `episodes` (`movie_id`, `episode_number`, `video_url`, `server_type`, `is_end`) VALUES
-(1, 1,  'https://www.youtube.com/embed/dQw4w9WgXcQ', 'Thuyết Minh', 0),
-(1, 2,  'https://www.youtube.com/embed/dQw4w9WgXcQ', 'Thuyết Minh', 0),
-(1, 60, 'https://www.youtube.com/embed/dQw4w9WgXcQ', 'Thuyết Minh', 1),
-(2, 1,  'https://www.youtube.com/embed/dQw4w9WgXcQ', 'Vietsub', 0),
-(3, 1,  'https://www.youtube.com/embed/dQw4w9WgXcQ', 'Thuyết Minh', 0);
+INSERT INTO `episodes` (`movie_id`, `episode_number`, `video_url`) VALUES
+(1, 1,  'https://www.youtube.com/embed/dQw4w9WgXcQ'),
+(1, 2,  'https://www.youtube.com/embed/dQw4w9WgXcQ'),
+(1, 60, 'https://www.youtube.com/embed/dQw4w9WgXcQ'),
+(2, 1,  'https://www.youtube.com/embed/dQw4w9WgXcQ'),
+(3, 1,  'https://www.youtube.com/embed/dQw4w9WgXcQ');
 
 -- ────────────────────────────────────────────────────────────
 -- Bảng: favorites

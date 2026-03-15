@@ -20,7 +20,7 @@ const EMPTY_FORM = {
     category_id: '',
     quality: '',
     status: 'Ongoing',
-    episode_display: '',
+    total_episodes: 1,
 };
 
 const CATEGORIES = [
@@ -116,9 +116,9 @@ const MovieForm = ({ initial, onSubmit, onClose, loading }) => {
                     </select>
                 </div>
                 <div>
-                    <label className="block text-sm text-gray-400 mb-1.5 font-medium">Hiển thị tập</label>
-                    <input name="episode_display" value={form.episode_display} onChange={handleChange}
-                        placeholder="VD: Tập 12" className={inputClass('episode_display')} />
+                    <label className="block text-sm text-gray-400 mb-1.5 font-medium">Tổng số tập</label>
+                    <input type="number" name="total_episodes" value={form.total_episodes} onChange={handleChange}
+                        min="1" max="999" placeholder="VD: 12" className={inputClass('total_episodes')} />
                 </div>
             </div>
             <div>
@@ -182,7 +182,7 @@ const Dashboard = () => {
         setError('');
         try {
             const res = await fetchMovies({});
-            setMovies(res.data.data || []);
+            setMovies(Array.isArray(res.data) ? res.data : (res.data.data || []));
         } catch {
             setError('Không thể tải danh sách phim.');
         } finally {
@@ -371,6 +371,12 @@ const Dashboard = () => {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center justify-center gap-2">
+                                                    <button
+                                                        onClick={() => navigate(`/admin/episodes/${movie.id}`)}
+                                                        className="flex items-center gap-1 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 px-3 py-1.5 rounded-lg text-xs font-medium transition border border-cyan-600/30"
+                                                    >
+                                                        <Plus size={12} /> Thêm tập
+                                                    </button>
                                                     <button onClick={() => setEditTarget(movie)}
                                                         className="flex items-center gap-1 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 px-3 py-1.5 rounded-lg text-xs font-medium transition border border-blue-600/30">
                                                         <Pencil size={12} /> Sửa

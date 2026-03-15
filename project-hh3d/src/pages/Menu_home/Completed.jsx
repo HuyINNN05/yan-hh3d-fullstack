@@ -8,7 +8,7 @@ function Completed() {
 
   useEffect(() => {
     // Gọi API lấy phim có status là 'Hoàn thành'
-    axios.get('http://localhost:5000/api/movies/status/Hoàn thành')
+    axios.get(`${import.meta.env.VITE_API_URL || ''}/api/movies/status/Hoàn thành`)
       .then(res => {
         setMovies(res.data);
         setLoading(false);

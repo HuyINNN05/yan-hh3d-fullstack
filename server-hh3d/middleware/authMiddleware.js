@@ -27,4 +27,22 @@ const authMiddleware = (req, res, next) => {
     }
 };
 
+/**
+ * Middleware kiểm tra role admin.
+ * Phải gọi sau authMiddleware.
+ */
+const adminMiddleware = (req, res, next) => {
+    if (!req.user) {
+        return errorResponse(res, 401, 'Không có token xác thực. Vui lòng đăng nhập.');
+    }
+
+    if (req.user.role !== 'admin') {
+        return errorResponse(res, 403, 'Chỉ admin mới có thể truy cập tài nguyên này.');
+    }
+
+    next();
+};
+
 module.exports = authMiddleware;
+module.exports.adminMiddleware = adminMiddleware;
+

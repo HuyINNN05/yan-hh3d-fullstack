@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  labels:
+    app: hh3d-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hh3d-db
+  template:
+    metadata:
+      labels:
+        app: hh3d-db
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:kubectl get pods
+                secretKeyRef:
+                  name: db-secret
+                  key: password
+            - name: MYSQL_DATABASE
+              value: "yanhh3d_db"
+          volumeMounts:
+            - name: db-storage
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: db-storage
+          persistentVolumeClaim:
+            claimName: db-pvc

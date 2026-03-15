@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axiosInstance from '../../api/axiosInstance';
 import AdminLayout from '../../compoment/AdminLayout';
 import { Search, Trash2, User, Mail, Shield, Calendar, UserCheck } from 'lucide-react';
 
@@ -13,8 +13,7 @@ function AdminUsers() {
 
   const fetchUsers = async () => {
     try {
-      // API này lát nữa mình sẽ viết ở Backend sau sếp nhé
-      const res = await axios.get('http://localhost:5000/api/admin/users');
+      const res = await axiosInstance.get('/admin/users');
       setUsers(res.data);
     } catch (err) {
       console.error("Lỗi lấy danh sách người dùng:", err);
@@ -24,7 +23,7 @@ function AdminUsers() {
   const handleDeleteUser = async (id) => {
     if (window.confirm("Sếp có chắc muốn xóa người dùng này không? Hành động này không thể hoàn tác!")) {
       try {
-        await axios.delete(`http://localhost:5000/api/admin/users/${id}`);
+        await axiosInstance.delete(`/admin/users/${id}`);
         fetchUsers();
       } catch (err) {
         alert("Lỗi xóa người dùng rồi sếp ơi!");

@@ -1,0 +1,85 @@
+version: "3.8"
+
+services:
+  # ── MySQL Database ──
+  db:
+    image: mysql:8.0
+    container_name: hh3d-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: yanhh3d_db
+      MYSQL_INITVAR_max_connections: 1000
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./server-hh3d/yanhh3d_db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hh3d-network
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # ── Backend API ──
+  backend:
+    build:
+      context: ./server-hh3d
+      dockerfile: Dockerfile
+    container_name: hh3d-backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: root123
+      DB_NAME: yanhh3d_db
+      PORT: 5000
+      NODE_ENV: production
+      JWT_SECRET: yanhh3d_super_secret_key_2026_change_in_production
+      JWT_EXPIRES_IN: 7d
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./project-hh3d/public/image:/app/uploads/image
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - hh3d-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ── Frontend ──
+  frontend:
+    build:
+      context: ./project-hh3d
+      dockerfile: Dockerfile
+    container_name: hh3d-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - hh3d-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  db_data:
+    driver: local
+
+networks:
+  hh3d-network:
+    driver: bridge

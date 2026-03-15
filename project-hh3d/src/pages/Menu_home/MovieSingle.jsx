@@ -9,7 +9,7 @@ function MoviesSingle() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get(`http://localhost:5000/api/movies/${id}`)
+    axios.get(`${import.meta.env.VITE_API_URL || ''}/api/movies/${id}`)
       .then(res => {
         setMovie(res.data);
         setLoading(false);
