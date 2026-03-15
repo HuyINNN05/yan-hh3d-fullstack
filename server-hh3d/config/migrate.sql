@@ -63,6 +63,9 @@ DROP TABLE IF EXISTS `movies`;
 CREATE TABLE `movies` (
   `id`              INT(11)      NOT NULL AUTO_INCREMENT,
   `title`           VARCHAR(255) NOT NULL,
+  `slug`            VARCHAR(255) DEFAULT NULL,
+  `poster`          LONGTEXT     DEFAULT NULL,
+  `category`        VARCHAR(100) DEFAULT NULL,
   `episode_display` VARCHAR(50)  DEFAULT NULL,
   `quality`         VARCHAR(50)  DEFAULT NULL,
   `image`           LONGTEXT     DEFAULT NULL,
@@ -81,31 +84,31 @@ CREATE TABLE `movies` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `movies`
-  (`title`, `episode_display`, `quality`, `image`, `show_schedule`, `category_id`, `status`, `total_episodes`, `description`, `views`, `video_url`)
+  (`title`, `slug`, `poster`, `category`, `episode_display`, `quality`, `image`, `show_schedule`, `category_id`, `status`, `total_episodes`, `description`, `views`, `video_url`)
 VALUES
 (
-  'Đấu Phá Thương Khung', 'Tập 60', '4K',
+  'Đấu Phá Thương Khung', 'dau-pha-thuong-khung', 'https://m.media-amazon.com/images/M/MV5BYjc0MjYyN2EtZGRhOS00NmFiLWJlNDYtZTg5MjhhNWZhMjdjXkEyXkFqcGc@._V1_.jpg', 'Tiên Hiệp', 'Tập 60', '4K',
   'https://m.media-amazon.com/images/M/MV5BYjc0MjYyN2EtZGRhOS00NmFiLWJlNDYtZTg5MjhhNWZhMjdjXkEyXkFqcGc@._V1_.jpg',
   'Thứ 2, 4, 6', 4, 'Completed', 60,
   'Tiêu Viêm - một thiên tài bị phế bỏ nhưng nhận được sự giúp đỡ bí ẩn, lên đường trở thành Đấu Đế mạnh nhất.',
   125000, 'https://www.youtube.com/embed/dQw4w9WgXcQ'
 ),
 (
-  'Toàn Chức Pháp Sư', 'Tập 39', 'FHD',
+  'Toàn Chức Pháp Sư', 'toan-chuc-phap-su', 'https://upload.wikimedia.org/wikipedia/en/3/3b/Full_Time_Magister_poster.jpg', 'Tiên Hiệp', 'Tập 39', 'FHD',
   'https://upload.wikimedia.org/wikipedia/en/3/3b/Full_Time_Magister_poster.jpg',
   'Thứ 3, 5, 7', 4, 'Ongoing', 39,
   'Mặc Phàm xuyên không vào thế giới phép thuật, sở hữu hệ Băng và Hỏa đôi hệ pháp sư.',
   98000, NULL
 ),
 (
-  'Hành Tinh Cực Hạn', 'Tập 12', 'HD',
+  'Hành Tinh Cực Hạn', 'hanh-tinh-cuc-han', 'https://upload.wikimedia.org/wikipedia/en/thumb/5/59/Planet_With_Volume_1_%28Japanese%29.jpg/220px-Planet_With_Volume_1_%28Japanese%29.jpg', 'Anime 3D', 'Tập 12', 'HD',
   'https://upload.wikimedia.org/wikipedia/en/thumb/5/59/Planet_With_Volume_1_%28Japanese%29.jpg/220px-Planet_With_Volume_1_%28Japanese%29.jpg',
   'Thứ 7, CN', 6, 'Completed', 12,
   'Cuộc chiến giữa con người và những sinh vật ngoài hành tinh bí ẩn.',
   44000, NULL
 ),
 (
-  'Diệt Thần Ký', 'Tập 80', '4K',
+  'Diệt Thần Ký', 'diet-than-ky', 'https://upload.wikimedia.org/wikipedia/en/thumb/5/5e/Dragon_Prince_Yuan_volume_1_cover.png/220px-Dragon_Prince_Yuan_volume_1_cover.png', 'Xuyên Không', 'Tập 80', '4K',
   'https://upload.wikimedia.org/wikipedia/en/thumb/5/5e/Dragon_Prince_Yuan_volume_1_cover.png/220px-Dragon_Prince_Yuan_volume_1_cover.png',
   'Hàng ngày', 2, 'Ongoing', 80,
   'Chu Nguyên — hoàng tử bị phế bỏ — vươn lên với sức mạnh thần bí, tìm lại vinh quang.',

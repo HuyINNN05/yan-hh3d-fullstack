@@ -7,6 +7,7 @@ import {
     updateMovie,
     deleteMovie,
 } from '../../api/movieApi';
+import axiosInstance from '../../api/axiosInstance';
 import {
     Film, Plus, Pencil, Trash2, X, LogOut,
     Search, AlertCircle, CheckCircle, Users, Eye,
@@ -14,10 +15,11 @@ import {
 
 const EMPTY_FORM = {
     title: '',
+    slug: '',
     description: '',
-    image: '',
+    poster: '',
     video_url: '',
-    category_id: '',
+    category: '',
     quality: '',
     status: 'Ongoing',
     total_episodes: 1,
@@ -53,13 +55,22 @@ const Modal = ({ title, onClose, children }) => (
 
 // ─── Movie Form ───────────────────────────────────────────────────────────────
 const MovieForm = ({ initial, onSubmit, onClose, loading }) => {
-    const [form, setForm] = useState(initial || EMPTY_FORM);
+    const [form, setForm] = useState(
+        initial
+            ? {
+                ...EMPTY_FORM,
+                ...initial,
+                poster: initial.poster || initial.image || '',
+                category: initial.category || initial.category_name || '',
+            }
+            : EMPTY_FORM
+    );
     const [errors, setErrors] = useState({});
 
     const validate = () => {
         const e = {};
         if (!form.title.trim()) e.title = 'Tên phim không được để trống';
-        if (!form.image.trim()) e.image = 'URL ảnh không được để trống';
+        if (!form.poster.trim()) e.poster = 'URL ảnh không được để trống';
         return e;
     };
 
@@ -92,10 +103,10 @@ const MovieForm = ({ initial, onSubmit, onClose, loading }) => {
             <div className="grid grid-cols-2 gap-3">
                 <div>
                     <label className="block text-sm text-gray-400 mb-1.5 font-medium">Thể loại</label>
-                    <select name="category_id" value={form.category_id} onChange={handleChange}
+                        <select name="category" value={form.category} onChange={handleChange}
                         className="w-full bg-[#2a2a2a] text-white border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition">
                         <option value="">-- Chọn thể loại --</option>
-                        {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            {CATEGORIES.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
                 </div>
                 <div>
@@ -123,9 +134,9 @@ const MovieForm = ({ initial, onSubmit, onClose, loading }) => {
             </div>
             <div>
                 <label className="block text-sm text-gray-400 mb-1.5 font-medium">URL ảnh bìa *</label>
-                <input name="image" value={form.image} onChange={handleChange}
-                    placeholder="https://..." className={inputClass('image')} />
-                {errors.image && <p className="text-red-400 text-xs mt-1">{errors.image}</p>}
+                <input name="poster" value={form.poster} onChange={handleChange}
+                    placeholder="https://..." className={inputClass('poster')} />
+                {errors.poster && <p className="text-red-400 text-xs mt-1">{errors.poster}</p>}
             </div>
             <div>
                 <label className="block text-sm text-gray-400 mb-1.5 font-medium">URL video</label>
@@ -139,10 +150,10 @@ const MovieForm = ({ initial, onSubmit, onClose, loading }) => {
                     rows={4} placeholder="Nội dung phim..."
                     className="w-full bg-[#2a2a2a] text-white placeholder-gray-500 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition resize-none" />
             </div>
-            {form.image && (
+            {form.poster && (
                 <div>
                     <label className="block text-sm text-gray-400 mb-1.5 font-medium">Preview ảnh</label>
-                    <img src={form.image} alt="preview"
+                    <img src={form.poster} alt="preview"
                         className="w-28 rounded-xl border border-gray-700 object-cover"
                         onError={e => { e.target.style.display = 'none'; }} />
                 </div>
@@ -176,6 +187,8 @@ const Dashboard = () => {
     const [showAdd,      setShowAdd]      = useState(false);
     const [editTarget,   setEditTarget]   = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [episodeModalMovie, setEpisodeModalMovie] = useState(null);
+    const [episodeForm, setEpisodeForm] = useState({ episode_number: '', video_url: '' });
 
     const load = async () => {
         setLoading(true);
@@ -200,7 +213,16 @@ const Dashboard = () => {
     const handleAdd = async (form) => {
         setSaving(true);
         try {
-            await createMovie(form);
+            await createMovie({
+                title: form.title,
+                slug: form.slug || undefined,
+                description: form.description,
+                poster: form.poster,
+                image: form.poster,
+                category: form.category,
+                total_episodes: Number(form.total_episodes) || 0,
+                status: form.status,
+            });
             await load();
             setShowAdd(false);
             showToast('success', 'Thêm phim thành công!');
@@ -212,7 +234,17 @@ const Dashboard = () => {
     const handleUpdate = async (form) => {
         setSaving(true);
         try {
-            await updateMovie(editTarget.id, form);
+            await updateMovie(editTarget.id, {
+                title: form.title,
+                slug: form.slug || undefined,
+                description: form.description,
+                poster: form.poster || form.image,
+                image: form.poster || form.image,
+                category: form.category || form.category_name,
+                category_id: form.category_id,
+                total_episodes: Number(form.total_episodes) || 0,
+                status: form.status,
+            });
             await load();
             setEditTarget(null);
             showToast('success', 'Cập nhật phim thành công!');
@@ -231,6 +263,38 @@ const Dashboard = () => {
         } catch (err) {
             showToast('error', err.response?.data?.message || 'Xóa thất bại.');
         } finally { setSaving(false); }
+    };
+
+    const handleOpenEpisodeModal = (movie) => {
+        setEpisodeModalMovie(movie);
+        setEpisodeForm({ episode_number: '', video_url: '' });
+    };
+
+    const handleAddEpisode = async (e) => {
+        e.preventDefault();
+        if (!episodeModalMovie) return;
+
+        const episodeNumber = parseInt(episodeForm.episode_number, 10);
+        if (!episodeNumber || !episodeForm.video_url.trim()) {
+            showToast('error', 'Cần nhập số tập và URL video.');
+            return;
+        }
+
+        setSaving(true);
+        try {
+            await axiosInstance.post('/admin/episodes', {
+                movie_id: episodeModalMovie.id,
+                episode_number: episodeNumber,
+                video_url: episodeForm.video_url.trim(),
+            });
+            await load();
+            setEpisodeModalMovie(null);
+            showToast('success', 'Thêm tập thành công!');
+        } catch (err) {
+            showToast('error', err.response?.data?.message || 'Không thể thêm tập.');
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleLogout = () => { logout(); navigate('/login'); };
@@ -372,7 +436,7 @@ const Dashboard = () => {
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center justify-center gap-2">
                                                     <button
-                                                        onClick={() => navigate(`/admin/episodes/${movie.id}`)}
+                                                        onClick={() => handleOpenEpisodeModal(movie)}
                                                         className="flex items-center gap-1 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 px-3 py-1.5 rounded-lg text-xs font-medium transition border border-cyan-600/30"
                                                     >
                                                         <Plus size={12} /> Thêm tập
@@ -431,6 +495,49 @@ const Dashboard = () => {
                             </button>
                         </div>
                     </div>
+                </Modal>
+            )}
+
+            {episodeModalMovie && (
+                <Modal title={`Thêm tập - ${episodeModalMovie.title}`} onClose={() => setEpisodeModalMovie(null)}>
+                    <form onSubmit={handleAddEpisode} className="space-y-4">
+                        <div>
+                            <label className="block text-sm text-gray-400 mb-1.5 font-medium">Số tập *</label>
+                            <input
+                                type="number"
+                                min="1"
+                                value={episodeForm.episode_number}
+                                onChange={(e) => setEpisodeForm((prev) => ({ ...prev, episode_number: e.target.value }))}
+                                className="w-full bg-[#2a2a2a] text-white border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                placeholder="Ví dụ: 1"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-gray-400 mb-1.5 font-medium">Youtube URL *</label>
+                            <input
+                                value={episodeForm.video_url}
+                                onChange={(e) => setEpisodeForm((prev) => ({ ...prev, video_url: e.target.value }))}
+                                className="w-full bg-[#2a2a2a] text-white border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                placeholder="https://www.youtube.com/watch?v=..."
+                            />
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="flex-1 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-black py-2.5 rounded-xl font-medium text-sm transition"
+                            >
+                                {saving ? 'Đang lưu...' : 'Thêm tập'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setEpisodeModalMovie(null)}
+                                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2.5 rounded-xl font-medium text-sm transition"
+                            >
+                                Hủy
+                            </button>
+                        </div>
+                    </form>
                 </Modal>
             )}
         </div>

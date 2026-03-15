@@ -236,7 +236,8 @@ function AdminMovies() {
           )}
 
           {filteredMovies.map((movie) => {
-            const adminImg = movie.image?.startsWith('http') ? movie.image : `/image/${movie.image}`;
+            const poster = movie.poster || movie.image || '';
+            const adminImg = poster.startsWith('/image/') || poster.startsWith('http') ? poster : `/image/${poster}`;
 
             return (
               <div key={movie.id} className="border-b border-white/5 last:border-b-0">
@@ -245,7 +246,7 @@ function AdminMovies() {
                   
                   <div className="col-span-1">
                     <div className="w-12 h-16 rounded-lg bg-black border border-white/10 overflow-hidden shadow-lg">
-                      {movie.image ? (
+                      {poster ? (
                         <img 
                           src={adminImg} 
                           className="w-full h-full object-cover" 
@@ -264,7 +265,7 @@ function AdminMovies() {
                   </div>
 
                   <div className="col-span-2 text-center">
-                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${movie.status === 'Hoàn thành' ? 'bg-green-500/10 text-green-500' : 'bg-orange-500/10 text-orange-500'}`}>
+                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${movie.status === 'Completed' ? 'bg-green-500/10 text-green-500' : 'bg-orange-500/10 text-orange-500'}`}>
                       {movie.status}
                     </span>
                   </div>

@@ -61,6 +61,9 @@ INSERT INTO users (id, username, email, password, avatar, role) VALUES
 CREATE TABLE movies (
   id INT NOT NULL AUTO_INCREMENT,
   title VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) DEFAULT NULL,
+  poster LONGTEXT DEFAULT NULL,
+  category VARCHAR(100) DEFAULT NULL,
   episode_display VARCHAR(50) DEFAULT NULL,
   quality VARCHAR(50) DEFAULT NULL,
   image LONGTEXT DEFAULT NULL,
@@ -83,16 +86,16 @@ CREATE TABLE movies (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO movies (
-  id, title, episode_display, quality, image, show_schedule, category_id,
+  id, title, slug, poster, category, episode_display, quality, image, show_schedule, category_id,
   status, total_episodes, description, views, video_url
 ) VALUES
-(1, 'Dau Pha Thuong Khung', '3/3', '4K', '/image/Dau-pha-thuong-khung.jpg', 'Thu 2', 6,
+(1, 'Dau Pha Thuong Khung', 'dau-pha-thuong-khung', '/image/Dau-pha-thuong-khung.jpg', 'Anime 3D', '3/3', '4K', '/image/Dau-pha-thuong-khung.jpg', 'Thu 2', 6,
  'Hoan thanh', 3, 'Bo phim hoat hinh 3D noi tieng.', 12000, 'https://www.youtube.com/embed/dQw4w9WgXcQ'),
-(2, 'The Gioi Hoan My', '2/12', 'FHD', '/image/Pham-nhan-tu-tien.jpg', 'Thu 6', 6,
+(2, 'The Gioi Hoan My', 'the-gioi-hoan-my', '/image/Pham-nhan-tu-tien.jpg', 'Anime 3D', '2/12', 'FHD', '/image/Pham-nhan-tu-tien.jpg', 'Thu 6', 6,
  'Dang tien hanh', 12, 'Phieu luu trong the gioi tu tien.', 9800, 'https://www.youtube.com/embed/dQw4w9WgXcQ'),
-(3, 'Than An Vuong Toa', '1/24', '4K', '/image/Tien-nghich.jpg', 'Thu 5', 7,
+(3, 'Than An Vuong Toa', 'than-an-vuong-toa', '/image/Tien-nghich.jpg', 'Anime 4K', '1/24', '4K', '/image/Tien-nghich.jpg', 'Thu 5', 7,
  'Dang tien hanh', 24, 'Hanh trinh chien dau va truong thanh.', 7400, 'https://www.youtube.com/embed/dQw4w9WgXcQ'),
-(4, 'Doc Bo Tieu Dao', '2/2', 'HD', '/image/Tien-de-tro-ve.jpg', 'Thu 3', 6,
+(4, 'Doc Bo Tieu Dao', 'doc-bo-tieu-dao', '/image/Tien-de-tro-ve.jpg', 'Anime 3D', '2/2', 'HD', '/image/Tien-de-tro-ve.jpg', 'Thu 3', 6,
  'Hoan thanh', 2, 'Series ngan de test he thong.', 3600, 'https://www.youtube.com/embed/dQw4w9WgXcQ');
 
 -- ============================================================

@@ -25,7 +25,7 @@ export default function Slider({ movies = [] }) {
         <div key={item.id}
           className={`absolute inset-0 transition-opacity duration-700 ${i === current ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}>
           <img
-            src={item.image || '/image/Dau-pha-thuong-khung.jpg'}
+            src={item.poster || item.image || '/image/Dau-pha-thuong-khung.jpg'}
             alt={item.title}
             className="w-full h-full object-cover object-top"
             onError={e => { e.target.src = '/image/Dau-pha-thuong-khung.jpg'; }} />

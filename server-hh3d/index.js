@@ -12,6 +12,41 @@ const { adminMiddleware } = require('./middleware/authMiddleware');
 
 let hasMovieTotalEpisodesColumn = false;
 
+function slugify(text = '') {
+    return String(text)
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 120);
+}
+
+function normalizeMovie(row) {
+    const categoryName = row.category_name || row.category || null;
+    const poster = row.poster || row.image || null;
+    return {
+        ...row,
+        slug: row.slug || slugify(row.title || ''),
+        poster,
+        image: poster,
+        category: categoryName,
+        category_name: categoryName,
+    };
+}
+
+async function resolveCategoryId(category, categoryId) {
+    if (categoryId) return Number(categoryId);
+    if (!category || !String(category).trim()) return null;
+
+    const name = String(category).trim();
+    const [existing] = await db.query('SELECT id FROM categories WHERE name = ? LIMIT 1', [name]);
+    if (existing.length > 0) return existing[0].id;
+
+    const [created] = await db.query('INSERT INTO categories (name, color_class) VALUES (?, ?)', [name, null]);
+    return created.insertId;
+}
+
 // Cấu hình multer - lưu ảnh vào thư mục uploads
 const uploadDir = process.env.NODE_ENV === 'production' 
     ? '/app/uploads/image'
@@ -114,8 +149,14 @@ app.use((err, req, res, next) => {
 // --- API PHIM ---
 app.get('/api/movies', async (req, res) => {
     try {
-        const [data] = await db.query("SELECT * FROM movies ORDER BY id DESC LIMIT 100");
-        return res.json(data);
+        const [data] = await db.query(
+            `SELECT movies.*, categories.name AS category_name
+             FROM movies
+             LEFT JOIN categories ON movies.category_id = categories.id
+             ORDER BY movies.id DESC
+             LIMIT 100`
+        );
+        return res.json(data.map(normalizeMovie));
     } catch (err) {
         console.error(err);
         return res.status(500).json({ message: "Lỗi lấy danh sách phim" });
@@ -128,10 +169,15 @@ app.get('/api/search', async (req, res) => {
         if (!searchTerm) return res.json([]);
         
         const [data] = await db.query(
-            "SELECT * FROM movies WHERE title LIKE ? ORDER BY id DESC LIMIT 20",
+            `SELECT movies.*, categories.name AS category_name
+             FROM movies
+             LEFT JOIN categories ON movies.category_id = categories.id
+             WHERE movies.title LIKE ?
+             ORDER BY movies.id DESC
+             LIMIT 20`,
             [`%${searchTerm}%`]
         );
-        return res.json(data);
+        return res.json(data.map(normalizeMovie));
     } catch (err) {
         console.error(err);
         return res.status(500).json({ message: "Lỗi tìm kiếm" });
@@ -141,6 +187,20 @@ app.get('/api/search', async (req, res) => {
 app.get('/api/episodes/:movieId', async (req, res) => {
     try {
         const movieId = req.params.movieId;
+        const [data] = await db.query(
+            "SELECT * FROM episodes WHERE movie_id = ? ORDER BY CAST(episode_number AS UNSIGNED) ASC",
+            [movieId]
+        );
+        return res.json(data);
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Lỗi lấy tập phim" });
+    }
+});
+
+app.get('/api/movies/:id/episodes', async (req, res) => {
+    try {
+        const movieId = req.params.id;
         const [data] = await db.query(
             "SELECT * FROM episodes WHERE movie_id = ? ORDER BY CAST(episode_number AS UNSIGNED) ASC",
             [movieId]
@@ -163,7 +223,7 @@ app.get('/api/movies/category/:id', async (req, res) => {
              ORDER BY movies.id DESC`,
             [categoryId]
         );
-        return res.json(data);
+        return res.json(data.map(normalizeMovie));
     } catch (err) {
         console.error(err);
         return res.status(500).json({ message: "Lỗi lấy phim theo thể loại" });
@@ -185,7 +245,7 @@ app.get('/api/movies/:id', async (req, res) => {
             return res.status(404).json({ message: "Không tìm thấy phim" });
         }
         
-        return res.json(data[0]);
+        return res.json(normalizeMovie(data[0]));
     } catch (err) {
         console.error(err);
         return res.status(500).json({ message: "Lỗi lấy chi tiết phim" });
@@ -318,7 +378,7 @@ app.get('/api/admin/movies', authMiddleware, adminMiddleware, async (req, res) =
         const [data] = await db.query(
             "SELECT movies.*, categories.name AS category_name FROM movies LEFT JOIN categories ON movies.category_id = categories.id ORDER BY movies.id DESC"
         );
-        return res.json(data);
+        return res.json(data.map(normalizeMovie));
     } catch (err) {
         console.error(err);
         return res.status(500).json({ message: "Lỗi lấy dữ liệu phim" });
@@ -327,15 +387,17 @@ app.get('/api/admin/movies', authMiddleware, adminMiddleware, async (req, res) =
 
 app.post('/api/admin/movies', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { title, image, description, category_id, total_episodes } = req.body;
+        const { title, image, poster, description, category_id, category, total_episodes, slug } = req.body;
+        const finalPoster = (poster || image || '').trim();
+        const resolvedCategoryId = await resolveCategoryId(category, category_id);
         
-        if (!title || !description || !image || !category_id) {
+        if (!title || !description || !finalPoster || !resolvedCategoryId) {
             return res.status(400).json({ message: "Cần nhập đủ title, description, poster và category" });
         }
 
         const [result] = await db.query(
             "INSERT INTO movies (title, image, description, category_id, status, total_episodes, quality, episode_display, show_schedule, video_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
-            [title.trim(), image.trim(), description.trim(), category_id, 'Đang tiến hành', total_episodes || 0, 'HD', null, null, null]
+            [title.trim(), finalPoster, description.trim(), resolvedCategoryId, 'Ongoing', Number(total_episodes) || 0, 'HD', slug || null, null, null]
         );
 
         return res.status(201).json({ 
@@ -351,15 +413,31 @@ app.post('/api/admin/movies', authMiddleware, adminMiddleware, async (req, res) 
 app.put('/api/admin/movies/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const id = req.params.id;
-        const { title, image, description, category_id, status, episode_display, show_schedule, video_url, quality, total_episodes } = req.body;
+        const {
+            title,
+            image,
+            poster,
+            description,
+            category_id,
+            category,
+            status,
+            episode_display,
+            show_schedule,
+            video_url,
+            quality,
+            total_episodes,
+            slug,
+        } = req.body;
+        const finalPoster = (poster || image || '').trim();
+        const resolvedCategoryId = await resolveCategoryId(category, category_id);
         
-        if (!title || !image) {
+        if (!title || !finalPoster) {
             return res.status(400).json({ message: "Tên phim và ảnh không được để trống" });
         }
 
         await db.query(
             "UPDATE movies SET title=?, image=?, description=?, category_id=?, status=?, total_episodes=?, episode_display=?, show_schedule=?, video_url=?, quality=?, updated_at=NOW() WHERE id=?",
-            [title, image, description, category_id, status, total_episodes || 0, episode_display, show_schedule, video_url, quality, id]
+            [title, finalPoster, description, resolvedCategoryId, status, Number(total_episodes) || 0, episode_display || slug || null, show_schedule, video_url, quality, id]
         );
 
         return res.json({ message: "Cập nhật phim thành công!" });

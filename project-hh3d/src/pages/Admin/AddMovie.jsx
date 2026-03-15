@@ -11,7 +11,7 @@ function AddMovie() {
   const [imagePreview, setImagePreview] = useState('');
   const [uploadStatus, setUploadStatus] = useState(''); // 'uploading' | 'done' | 'error'
   const [movieData, setMovieData] = useState({
-    title: '', image: '', description: '', category_id: '',
+    title: '', slug: '', poster: '', image: '', description: '', category_id: '', category: '',
     total_episodes: 1
   });
 
@@ -35,7 +35,7 @@ function AddMovie() {
       const res = await axiosInstance.post('/admin/upload-image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      setMovieData(prev => ({ ...prev, image: res.data.path }));
+      setMovieData(prev => ({ ...prev, poster: res.data.path, image: res.data.path }));
       setUploadStatus('done');
     } catch (err) {
       console.error('Lỗi upload:', err);
@@ -51,9 +51,12 @@ function AddMovie() {
     try {
       await axiosInstance.post('/admin/movies', {
         title: movieData.title,
+        slug: movieData.slug || undefined,
         description: movieData.description,
-        image: movieData.image,
+        poster: movieData.poster || movieData.image,
+        image: movieData.poster || movieData.image,
         category_id: Number(movieData.category_id),
+        category: movieData.category,
         total_episodes: Number(movieData.total_episodes) || 0,
       });
       alert('Đã tạo bộ phim thành công! Bây giờ hãy thêm các tập phim.');
@@ -123,15 +126,15 @@ function AddMovie() {
                   onChange={(e) => {
                     let imageUrl = e.target.value;
                     // Se for URL http/https, manter como está. Senão, manter path local
-                    setMovieData(prev => ({ ...prev, image: imageUrl }));
+                    setMovieData(prev => ({ ...prev, poster: imageUrl, image: imageUrl }));
                     setImagePreview(imageUrl);
                     setUploadStatus('');
                   }}
-                  value={movieData.image}
+                  value={movieData.poster || movieData.image}
                 />
-                {movieData.image && (
+                {(movieData.poster || movieData.image) && (
                   <p className="text-[10px] text-gray-400 mt-2">
-                    {movieData.image.includes('http') ? '🌐 URL externo' : '📁 Local'}
+                    {(movieData.poster || movieData.image).includes('http') ? 'URL externe' : 'Local'}
                   </p>
                 )}
               </div>
@@ -149,6 +152,15 @@ function AddMovie() {
                     className="w-full bg-black border border-white/5 rounded-xl py-4 px-5 text-white outline-none focus:border-cyan-500 font-bold"
                     placeholder="VD: Đấu Phá Thương Khung"
                     onChange={(e) => setMovieData(prev => ({ ...prev, title: e.target.value }))} />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block">Slug (tự chọn)</label>
+                  <input type="text"
+                    className="w-full bg-black border border-white/5 rounded-xl py-3 px-4 text-white text-sm outline-none focus:border-cyan-500"
+                    placeholder="dau-pha-thuong-khung"
+                    value={movieData.slug}
+                    onChange={(e) => setMovieData(prev => ({ ...prev, slug: e.target.value }))} />
                 </div>
 
                 <div className="bg-cyan-500/5 p-5 rounded-2xl border border-cyan-500/10">
@@ -176,7 +188,11 @@ function AddMovie() {
                     <select required
                       className="w-full bg-black border border-white/5 rounded-xl py-3 px-4 text-white"
                       value={movieData.category_id}
-                      onChange={(e) => setMovieData(prev => ({ ...prev, category_id: e.target.value }))}>
+                      onChange={(e) => {
+                        const selectedId = e.target.value;
+                        const selected = categories.find((cat) => String(cat.id) === String(selectedId));
+                        setMovieData(prev => ({ ...prev, category_id: selectedId, category: selected?.name || '' }));
+                      }}>
                       <option value="">-- Chọn --</option>
                       {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                     </select>

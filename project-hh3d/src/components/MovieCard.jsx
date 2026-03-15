@@ -18,8 +18,8 @@ function getImageUrl(image) {
 }
 
 export default function MovieCard({ movie }) {
-  const { id, title, image, quality, status, views, total_episodes } = movie;
-  const imgSrc = getImageUrl(image);
+  const { id, title, image, poster, quality, status, views, total_episodes } = movie;
+  const imgSrc = getImageUrl(poster || image);
 
   return (
     <Link to={`/movie/${id}`} className="group relative block bg-[#111827] rounded-xl overflow-hidden border border-transparent hover:border-orange-500/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-orange-900/20">
