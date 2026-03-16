@@ -11,6 +11,7 @@ const authMiddleware = require('./middleware/authMiddleware');
 const { adminMiddleware } = require('./middleware/authMiddleware');
 
 let hasMovieTotalEpisodesColumn = false;
+const viewThrottle = new Map();
 
 function slugify(text = '') {
     return String(text)
@@ -288,11 +289,45 @@ app.get('/api/movies/:id', async (req, res) => {
         if (data.length === 0) {
             return res.status(404).json({ message: "Không tìm thấy phim" });
         }
-        
+
         return res.json(normalizeMovie(data[0]));
     } catch (err) {
         console.error(err);
         return res.status(500).json({ message: "Lỗi lấy chi tiết phim" });
+    }
+});
+
+app.post('/api/movies/:id/view', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const episode = Number(req.body?.episode || 0);
+
+        if (!Number.isFinite(id) || id <= 0) {
+            return res.status(400).json({ message: 'ID phim không hợp lệ' });
+        }
+
+        const [movieRows] = await db.query('SELECT id FROM movies WHERE id = ? LIMIT 1', [id]);
+        if (movieRows.length === 0) {
+            return res.status(404).json({ message: 'Không tìm thấy phim' });
+        }
+
+        const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
+        const key = `${clientIp}:${id}:${episode}`;
+        const now = Date.now();
+        const lastAt = viewThrottle.get(key) || 0;
+
+        // Chống cộng dồn do gọi lặp nhanh (double render, retry, click đúp).
+        if (now - lastAt < 15000) {
+            return res.json({ incremented: false, reason: 'throttled' });
+        }
+
+        viewThrottle.set(key, now);
+        await db.query('UPDATE movies SET views = COALESCE(views, 0) + 1 WHERE id = ?', [id]);
+
+        return res.json({ incremented: true });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Lỗi cập nhật lượt xem' });
     }
 });
 
@@ -420,7 +455,7 @@ app.post('/api/register', async (req, res) => {
 app.get('/api/admin/movies', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const [data] = await db.query(
-            "SELECT movies.*, categories.name AS category_name FROM movies LEFT JOIN categories ON movies.category_id = categories.id ORDER BY movies.id DESC"
+            "SELECT movies.*, COALESCE(movies.views, 0) AS views, categories.name AS category_name FROM movies LEFT JOIN categories ON movies.category_id = categories.id ORDER BY movies.id DESC"
         );
         return res.json(data.map(normalizeMovie));
     } catch (err) {

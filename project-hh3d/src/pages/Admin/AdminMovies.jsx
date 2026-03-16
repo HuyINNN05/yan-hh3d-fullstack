@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../../compoment/AdminLayout';
 import axiosInstance from '../../api/axiosInstance';
 import { createAdminEpisode, fetchAdminEpisodesByMovie } from '../../api/episodeApi';
-import { Plus, Search, Edit2, Trash2, Film, X, Save } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Film, X, Save, RefreshCw } from 'lucide-react';
 
 function toEmbedUrl(url) {
   if (!url) return '';
@@ -45,6 +45,24 @@ function AdminMovies() {
 
   useEffect(() => {
     fetchMovies();
+  }, []);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchMovies();
+    }, 15000);
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        fetchMovies();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   const fetchMovies = async () => {
@@ -203,6 +221,13 @@ function AdminMovies() {
           <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mt-1">Tổng cộng: {filteredMovies.length} bộ phim</p>
         </div>
         <div className="flex gap-4">
+          <button
+            onClick={fetchMovies}
+            className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-4 py-3 rounded-xl font-black text-[10px] uppercase flex items-center gap-2 transition-all"
+            title="Làm mới danh sách phim"
+          >
+            <RefreshCw size={16} /> Làm mới
+          </button>
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
             <input
@@ -259,9 +284,18 @@ function AdminMovies() {
                     </div>
                   </div>
 
-                  <div className="col-span-3">
+                  <div className="col-span-2">
                     <div className="font-black text-white text-sm uppercase italic">{movie.title}</div>
-                    <div className="text-[10px] text-gray-500 font-bold mt-1">{Number(movie.total_episodes) || 0} Tập</div>
+                    <div className="text-[10px] text-gray-500 font-bold mt-1">
+                      {Number(movie.total_episodes) || 0} Tập • {Number(movie.views) || 0} lượt xem
+                    </div>
+                  </div>
+
+                  <div className="col-span-1">
+                    <div className="text-center">
+                      <div className="text-[10px] text-gray-400 font-bold">Lượt xem</div>
+                      <div className="text-sm font-black text-cyan-400">{Number(movie.views) || 0}</div>
+                    </div>
                   </div>
 
                   <div className="col-span-2 text-center">

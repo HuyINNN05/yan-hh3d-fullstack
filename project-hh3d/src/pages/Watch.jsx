@@ -27,6 +27,18 @@ export default function Watch() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const key = `viewed:${movieId}:${selectedEpisode}`;
+    const lastAt = Number(sessionStorage.getItem(key) || 0);
+    const now = Date.now();
+
+    // Chỉ ghi nhận 1 lượt xem cho cùng 1 tập trong 15 giây ở cùng tab.
+    if (now - lastAt < 15000) return;
+
+    sessionStorage.setItem(key, String(now));
+    axios.post(`${API}/api/movies/${movieId}/view`, { episode: selectedEpisode }).catch(console.error);
+  }, [movieId, selectedEpisode]);
+
+  useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
