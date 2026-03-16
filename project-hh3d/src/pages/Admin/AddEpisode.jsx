@@ -59,7 +59,8 @@ function AddEpisode() {
       alert("Đã thêm tập phim mới thành công sếp ơi!");
       setEpisodeData({ ...episodeData, episode_number: parseInt(episodeData.episode_number) + 1, video_url: '', title: '' });
     } catch (err) {
-      alert("Lỗi rồi! Sếp kiểm tra lại Backend hoặc Database nhé.");
+      const message = err?.response?.data?.message || err.message || 'Không xác định được lỗi';
+      alert(`Lỗi thêm tập: ${message}`);
     } finally {
       setIsSubmitting(false);
     }

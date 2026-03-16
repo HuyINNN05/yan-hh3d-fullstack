@@ -35,8 +35,15 @@ export default function Login() {
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
         
-        // Redirect based on role
-        navigate(res.data.user.role === 'admin' ? '/admin' : '/');
+        // Check if there's a return URL
+        const returnTo = localStorage.getItem('returnTo');
+        if (returnTo && returnTo !== '/login') {
+          localStorage.removeItem('returnTo');
+          navigate(returnTo);
+        } else {
+          // Redirect based on role
+          navigate(res.data.user.role === 'admin' ? '/admin' : '/');
+        }
       } else {
         setError(res.data?.message || 'Đăng nhập thất bại.');
       }

@@ -35,6 +35,50 @@ function normalizeMovie(row) {
     };
 }
 
+function extractYoutubeVideoId(input = '') {
+    const raw = String(input || '').trim();
+    if (!raw) return null;
+
+    if (/^[\w-]{11}$/.test(raw)) return raw;
+
+    const regexPatterns = [
+        /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?(?:.*&)?v=([\w-]{11})/i,
+        /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/watch\?v=([\w-]{11})/i,
+        /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([\w-]{11})/i,
+        /(?:https?:\/\/)?(?:www\.)?youtube\.com\/shorts\/([\w-]{11})/i,
+        /(?:https?:\/\/)?youtu\.be\/([\w-]{11})/i,
+    ];
+
+    for (const pattern of regexPatterns) {
+        const matched = raw.match(pattern);
+        if (matched && matched[1]) return matched[1];
+    }
+
+    try {
+        if (/^https?:\/\//i.test(raw)) {
+            const parsed = new URL(raw);
+            const fromQuery = parsed.searchParams.get('v');
+            if (fromQuery && /^[\w-]{11}$/.test(fromQuery)) return fromQuery;
+
+            const parts = parsed.pathname.split('/').filter(Boolean);
+            if (parts.length > 0) {
+                const tail = parts[parts.length - 1];
+                if (/^[\w-]{11}$/.test(tail)) return tail;
+            }
+        }
+    } catch (err) {
+        return null;
+    }
+
+    return null;
+}
+
+function normalizeYoutubeEmbedUrl(input = '') {
+    const videoId = extractYoutubeVideoId(input);
+    if (!videoId) return null;
+    return `https://www.youtube.com/embed/${videoId}`;
+}
+
 async function resolveCategoryId(category, categoryId) {
     if (categoryId) return Number(categoryId);
     if (!category || !String(category).trim()) return null;
@@ -481,10 +525,11 @@ app.get('/api/admin/episodes/:movieId', authMiddleware, adminMiddleware, async (
 app.post('/api/admin/episodes', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { movie_id, episode_number, video_url, youtube_url } = req.body;
-        const normalizedVideoUrl = (youtube_url || video_url || '').trim();
+        const normalizedVideoInput = (youtube_url || video_url || '').trim();
         const normalizedEpisodeNumber = parseInt(episode_number, 10);
+        const normalizedVideoUrl = normalizeYoutubeEmbedUrl(normalizedVideoInput);
         
-        if (!movie_id || !normalizedEpisodeNumber || !normalizedVideoUrl) {
+        if (!movie_id || !normalizedEpisodeNumber || !normalizedVideoInput) {
             return res.status(400).json({ message: "Movie ID, Episode số, và Video URL không được để trống" });
         }
 
@@ -492,8 +537,7 @@ app.post('/api/admin/episodes', authMiddleware, adminMiddleware, async (req, res
             return res.status(400).json({ message: 'Episode number phải lớn hơn 0' });
         }
 
-        const isYoutubeLike = /^(https?:\/\/)?((www\.)?youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]{6,}|^[\w-]{11}$/.test(normalizedVideoUrl);
-        if (!isYoutubeLike) {
+        if (!normalizedVideoUrl) {
             return res.status(400).json({ message: 'Youtube URL không hợp lệ' });
         }
 
@@ -541,11 +585,16 @@ app.put('/api/admin/episodes/:id', authMiddleware, adminMiddleware, async (req, 
     try {
         const id = req.params.id;
         const { movie_id, episode_number, video_url, youtube_url } = req.body;
-        const normalizedVideoUrl = (youtube_url || video_url || '').trim();
+        const normalizedVideoInput = (youtube_url || video_url || '').trim();
         const normalizedEpisodeNumber = parseInt(episode_number, 10);
+        const normalizedVideoUrl = normalizeYoutubeEmbedUrl(normalizedVideoInput);
         
-        if (!normalizedEpisodeNumber || !normalizedVideoUrl) {
+        if (!normalizedEpisodeNumber || !normalizedVideoInput) {
             return res.status(400).json({ message: "Episode số và Video URL không được để trống" });
+        }
+
+        if (!normalizedVideoUrl) {
+            return res.status(400).json({ message: 'Youtube URL không hợp lệ' });
         }
 
         // Lấy thông tin tập cũ để so sánh
@@ -698,6 +747,198 @@ app.get('/health', async (req, res) => {
         res.json({ status: 'ok', timestamp: new Date().toISOString() });
     } catch (err) {
         res.status(503).json({ status: 'database error', message: err.message });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMMENTS MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+// GET comments cho phim
+app.get('/api/movies/:movieId/comments', async (req, res) => {
+    try {
+        const { movieId } = req.params;
+        const [comments] = await db.query(
+            `SELECT comments.id, comments.content, comments.created_at,
+                    users.id as user_id, users.username, users.avatar
+             FROM comments
+             JOIN users ON comments.user_id = users.id
+             WHERE comments.movie_id = ?
+             ORDER BY comments.created_at DESC`,
+            [movieId]
+        );
+        res.json(comments || []);
+    } catch (err) {
+        console.error('Lỗi lấy comments:', err);
+        res.status(500).json({ message: 'Lỗi lấy bình luận' });
+    }
+});
+
+// POST comment mới (cần login)
+app.post('/api/movies/:movieId/comments', authMiddleware, async (req, res) => {
+    try {
+        const { movieId } = req.params;
+        const { content } = req.body;
+        const userId = req.user.id;
+
+        if (!content || !content.trim()) {
+            return res.status(400).json({ message: 'Bình luận không được để trống' });
+        }
+
+        if (content.trim().length > 1000) {
+            return res.status(400).json({ message: 'Bình luận tối đa 1000 ký tự' });
+        }
+
+        // Kiểm tra phim tồn tại
+        const [movie] = await db.query('SELECT id FROM movies WHERE id = ?', [movieId]);
+        if (!movie.length) {
+            return res.status(404).json({ message: 'Phim không tồn tại' });
+        }
+
+        const [result] = await db.query(
+            'INSERT INTO comments (movie_id, user_id, content) VALUES (?, ?, ?)',
+            [movieId, userId, content.trim()]
+        );
+
+        res.status(201).json({ 
+            message: 'Bình luận đã được thêm',
+            id: result.insertId
+        });
+    } catch (err) {
+        console.error('Lỗi thêm comment:', err);
+        res.status(500).json({ message: 'Lỗi thêm bình luận' });
+    }
+});
+
+// DELETE comment (chỉ admin hoặc chủ comment)
+app.delete('/api/comments/:id', authMiddleware, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        const [comment] = await db.query('SELECT user_id FROM comments WHERE id = ?', [id]);
+        if (!comment.length) {
+            return res.status(404).json({ message: 'Bình luận không tồn tại' });
+        }
+
+        if (comment[0].user_id !== userId && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Không có quyền xóa bình luận' });
+        }
+
+        await db.query('DELETE FROM comments WHERE id = ?', [id]);
+        res.json({ message: 'Bình luận đã bị xóa' });
+    } catch (err) {
+        console.error('Lỗi xóa comment:', err);
+        res.status(500).json({ message: 'Lỗi xóa bình luận' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RATINGS MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+// GET rating stats của phim
+app.get('/api/movies/:movieId/ratings', async (req, res) => {
+    try {
+        const { movieId } = req.params;
+
+        // Lấy thống kê rating
+        const [stats] = await db.query(
+            `SELECT 
+                COUNT(*) as total_votes,
+                COALESCE(ROUND(AVG(rating), 1), 0) as avg_rating,
+                COUNT(CASE WHEN rating = 5 THEN 1 END) as five_star,
+                COUNT(CASE WHEN rating = 4 THEN 1 END) as four_star,
+                COUNT(CASE WHEN rating = 3 THEN 1 END) as three_star,
+                COUNT(CASE WHEN rating = 2 THEN 1 END) as two_star,
+                COUNT(CASE WHEN rating = 1 THEN 1 END) as one_star
+             FROM ratings
+             WHERE movie_id = ?`,
+            [movieId]
+        );
+
+        const ratingData = stats[0] || {
+            total_votes: 0,
+            avg_rating: 0,
+            five_star: 0,
+            four_star: 0,
+            three_star: 0,
+            two_star: 0,
+            one_star: 0
+        };
+
+        res.json(ratingData);
+    } catch (err) {
+        console.error('Lỗi lấy ratings:', err);
+        res.status(500).json({ message: 'Lỗi lấy đánh giá' });
+    }
+});
+
+// GET user's rating cho phim (cần login)
+app.get('/api/movies/:movieId/my-rating', authMiddleware, async (req, res) => {
+    try {
+        const { movieId } = req.params;
+        const userId = req.user.id;
+
+        const [userRating] = await db.query(
+            'SELECT rating FROM ratings WHERE movie_id = ? AND user_id = ? LIMIT 1',
+            [movieId, userId]
+        );
+
+        if (userRating.length) {
+            res.json({ rating: userRating[0].rating });
+        } else {
+            res.json({ rating: null });
+        }
+    } catch (err) {
+        console.error('Lỗi lấy rating user:', err);
+        res.status(500).json({ message: 'Lỗi lấy đánh giá của bạn' });
+    }
+});
+
+// POST/PUT rating (cần login)
+app.post('/api/movies/:movieId/ratings', authMiddleware, async (req, res) => {
+    try {
+        const { movieId } = req.params;
+        const { rating } = req.body;
+        const userId = req.user.id;
+
+        if (!rating || isNaN(rating) || rating < 1 || rating > 5) {
+            return res.status(400).json({ message: 'Đánh giá phải từ 1 đến 5 sao' });
+        }
+
+        const ratingValue = Math.round(rating);
+
+        // Kiểm tra phim tồn tại
+        const [movie] = await db.query('SELECT id FROM movies WHERE id = ?', [movieId]);
+        if (!movie.length) {
+            return res.status(404).json({ message: 'Phim không tồn tại' });
+        }
+
+        // Insert hoặc update rating
+        const [existing] = await db.query(
+            'SELECT id FROM ratings WHERE movie_id = ? AND user_id = ?',
+            [movieId, userId]
+        );
+
+        if (existing.length > 0) {
+            // Update
+            await db.query(
+                'UPDATE ratings SET rating = ?, updated_at = NOW() WHERE movie_id = ? AND user_id = ?',
+                [ratingValue, movieId, userId]
+            );
+            res.json({ message: 'Cập nhật đánh giá thành công' });
+        } else {
+            // Insert
+            const [result] = await db.query(
+                'INSERT INTO ratings (movie_id, user_id, rating) VALUES (?, ?, ?)',
+                [movieId, userId, ratingValue]
+            );
+            res.status(201).json({ message: 'Đánh giá đã được thêm', id: result.insertId });
+        }
+    } catch (err) {
+        console.error('Lỗi xử lý rating:', err);
+        res.status(500).json({ message: 'Lỗi xử lý đánh giá' });
     }
 });
 

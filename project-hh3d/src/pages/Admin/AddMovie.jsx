@@ -171,7 +171,7 @@ function AddMovie() {
 
                 {/* Số lượng tập */}
                 <div>
-                  <label className="text-[10px] font-black text-cyan-400 uppercase mb-2 flex items-center gap-1 block">
+                  <label className="text-[10px] font-black text-cyan-400 uppercase mb-2 flex items-center gap-1">
                     📺 Số lượng tập tối đa *
                   </label>
                   <p className="text-[10px] text-gray-400 mb-2">Đây là tổng số tập sẽ có của bộ phim (tập 1 đến tập này)</p>
