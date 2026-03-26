@@ -38,6 +38,24 @@ const CATEGORIES = [
 const STATUSES = ['Ongoing', 'Completed', 'Upcoming'];
 const QUALITIES = ['HD', 'FHD', '4K', 'CAM'];
 
+const QUALITY_KEYS = ['360p', '720p', '1080p', '4k'];
+
+function toEmbedUrl(url) {
+    if (!url) return '';
+    if (url.includes('youtube.com/embed/')) return url.split('&')[0];
+    const ytWatch = url.match(/(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/);
+    if (ytWatch?.[1]) return `https://www.youtube.com/embed/${ytWatch[1]}`;
+    const ytShort = url.match(/(?:https?:\/\/)?youtu\.be\/([a-zA-Z0-9_-]+)/);
+    if (ytShort?.[1]) return `https://www.youtube.com/embed/${ytShort[1]}`;
+    if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return `https://www.youtube.com/embed/${url}`;
+    return url;
+}
+
+function isYoutubeLike(url) {
+    if (!url) return false;
+    return /^(https?:\/\/)?((www\.)?youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]{6,}|^[\w-]{11}$/.test(url.trim());
+}
+
 // ─── Reusable Modal ───────────────────────────────────────────────────────────
 const Modal = ({ title, onClose, children }) => (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -188,7 +206,15 @@ const Dashboard = () => {
     const [editTarget,   setEditTarget]   = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [episodeModalMovie, setEpisodeModalMovie] = useState(null);
-    const [episodeForm, setEpisodeForm] = useState({ episode_number: '', video_url: '' });
+    const [episodeForm, setEpisodeForm] = useState({
+        episode_number: '',
+        sources: {
+            '360p': '',
+            '720p': '',
+            '1080p': '',
+            '4k': '',
+        },
+    });
 
     const load = async () => {
         setLoading(true);
@@ -267,7 +293,15 @@ const Dashboard = () => {
 
     const handleOpenEpisodeModal = (movie) => {
         setEpisodeModalMovie(movie);
-        setEpisodeForm({ episode_number: '', video_url: '' });
+        setEpisodeForm({
+            episode_number: '',
+            sources: {
+                '360p': '',
+                '720p': '',
+                '1080p': '',
+                '4k': '',
+            },
+        });
     };
 
     const handleAddEpisode = async (e) => {
@@ -275,8 +309,26 @@ const Dashboard = () => {
         if (!episodeModalMovie) return;
 
         const episodeNumber = parseInt(episodeForm.episode_number, 10);
-        if (!episodeNumber || !episodeForm.video_url.trim()) {
-            showToast('error', 'Cần nhập số tập và URL video.');
+        if (!episodeNumber) {
+            showToast('error', 'Cần nhập số tập hợp lệ.');
+            return;
+        }
+
+        const allFilled = QUALITY_KEYS.every((q) => episodeForm.sources[q] && episodeForm.sources[q].trim());
+        if (!allFilled) {
+            showToast('error', 'Cần nhập đủ 4 link YouTube cho 4 mức chất lượng.');
+            return;
+        }
+
+        const invalid = QUALITY_KEYS.some((q) => !isYoutubeLike(episodeForm.sources[q]));
+        if (invalid) {
+            showToast('error', 'Có link YouTube không hợp lệ.');
+            return;
+        }
+
+        const normalized = QUALITY_KEYS.map((q) => toEmbedUrl(episodeForm.sources[q].trim()));
+        if (new Set(normalized).size !== normalized.length) {
+            showToast('error', '4 chất lượng phải dùng 4 link khác nhau.');
             return;
         }
 
@@ -285,7 +337,12 @@ const Dashboard = () => {
             await axiosInstance.post('/admin/episodes', {
                 movie_id: episodeModalMovie.id,
                 episode_number: episodeNumber,
-                video_url: episodeForm.video_url.trim(),
+                sources: {
+                    '360p': normalized[0],
+                    '720p': normalized[1],
+                    '1080p': normalized[2],
+                    '4k': normalized[3],
+                },
             });
             await load();
             setEpisodeModalMovie(null);
@@ -315,6 +372,12 @@ const Dashboard = () => {
                     <span className="font-bold text-lg">HH3D Admin</span>
                 </div>
                 <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => navigate('/admin/movies')}
+                        className="hidden sm:flex items-center gap-2 bg-cyan-600/20 hover:bg-cyan-600/35 text-cyan-300 border border-cyan-600/40 px-3 py-1.5 rounded-lg text-xs font-medium transition"
+                    >
+                        <Film size={14} /> Quản lý phim
+                    </button>
                     <span className="text-gray-400 text-sm hidden sm:block">
                         Xin chào, <span className="text-purple-300 font-medium">{user?.email}</span>
                     </span>
@@ -512,14 +575,24 @@ const Dashboard = () => {
                                 placeholder="Ví dụ: 1"
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm text-gray-400 mb-1.5 font-medium">Youtube URL *</label>
-                            <input
-                                value={episodeForm.video_url}
-                                onChange={(e) => setEpisodeForm((prev) => ({ ...prev, video_url: e.target.value }))}
-                                className="w-full bg-[#2a2a2a] text-white border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                                placeholder="https://www.youtube.com/watch?v=..."
-                            />
+                        <div className="bg-cyan-600/5 border border-cyan-600/20 rounded-xl p-3 space-y-3">
+                            <p className="text-xs text-cyan-300 font-semibold">Nhập 4 link YouTube theo từng chất lượng</p>
+                            {QUALITY_KEYS.map((quality) => (
+                                <div key={quality}>
+                                    <label className="block text-sm text-gray-400 mb-1.5 font-medium">
+                                        {quality.toUpperCase()} {quality === '4k' ? '(VIP)' : ''} *
+                                    </label>
+                                    <input
+                                        value={episodeForm.sources[quality]}
+                                        onChange={(e) => setEpisodeForm((prev) => ({
+                                            ...prev,
+                                            sources: { ...prev.sources, [quality]: e.target.value },
+                                        }))}
+                                        className="w-full bg-[#2a2a2a] text-white border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                        placeholder={`https://www.youtube.com/watch?v=... (${quality})`}
+                                    />
+                                </div>
+                            ))}
                         </div>
                         <div className="flex gap-3 pt-2">
                             <button

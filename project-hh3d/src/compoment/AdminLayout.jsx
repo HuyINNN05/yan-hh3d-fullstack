@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Film, ListPlus, Users, LogOut, Home } from 'lucide-react';
+import { LayoutDashboard, Film, Users, LogOut, Home } from 'lucide-react';
 
 function AdminLayout({ children }) {
   const navigate = useNavigate();
@@ -37,10 +37,7 @@ function AdminLayout({ children }) {
             <LayoutDashboard size={18} /> Dashboard
           </Link>
           <Link to="/admin/movies" className="flex items-center gap-3 p-3 hover:bg-white/5 rounded-lg transition-all text-xs font-bold uppercase">
-            <Film size={18} /> Quản lý phim
-          </Link>
-          <Link to="/admin/episodes" className="flex items-center gap-3 p-3 hover:bg-white/5 rounded-lg transition-all text-xs font-bold uppercase">
-            <ListPlus size={18} /> Thêm tập phim
+            <Film size={18} /> Quản lý Phim & Tập
           </Link>
           <Link to="/admin/users" className="flex items-center gap-3 p-3 hover:bg-white/5 rounded-lg transition-all text-xs font-bold uppercase">
             <Users size={18} /> Người dùng

@@ -37,7 +37,12 @@ function AdminMovies() {
 
   const [episodeForm, setEpisodeForm] = useState({
     episode_number: '',
-    youtube_url: '',
+    sources: {
+      '360p': '',
+      '720p': '',
+      '1080p': '',
+      '4k': '',
+    },
   });
 
   const [formErrors, setFormErrors] = useState({});
@@ -126,7 +131,12 @@ function AdminMovies() {
 
     setEpisodeForm({
       episode_number: String(nextEpisodeNumber),
-      youtube_url: '',
+      sources: {
+        '360p': '',
+        '720p': '',
+        '1080p': '',
+        '4k': '',
+      },
     });
   };
 
@@ -146,10 +156,21 @@ function AdminMovies() {
       nextErrors.episode_number = 'Episode number phải là số nguyên > 0';
     }
 
-    if (!episodeForm.youtube_url.trim()) {
-      nextErrors.youtube_url = 'Youtube URL là bắt buộc';
-    } else if (!isYoutubeLike(episodeForm.youtube_url)) {
-      nextErrors.youtube_url = 'Youtube URL không hợp lệ';
+    const allSourcesFilled = Object.values(episodeForm.sources).every(url => url && url.trim() !== '');
+    if (!allSourcesFilled) {
+      nextErrors.sources = 'Bạn phải nhập đầy đủ 4 link video cho từng chất lượng';
+    }
+
+    const hasInvalidYoutube = Object.values(episodeForm.sources).some((url) => !isYoutubeLike(url || ''));
+    if (!nextErrors.sources && hasInvalidYoutube) {
+      nextErrors.sources = 'Tất cả nguồn phải là YouTube URL hoặc YouTube ID hợp lệ';
+    }
+
+    const normalizedUrls = Object.values(episodeForm.sources)
+      .map((url) => toEmbedUrl((url || '').trim()))
+      .filter(Boolean);
+    if (!nextErrors.sources && new Set(normalizedUrls).size !== normalizedUrls.length) {
+      nextErrors.sources = '4 chất lượng phải dùng 4 link khác nhau';
     }
 
     if (currentMovie) {
@@ -167,7 +188,14 @@ function AdminMovies() {
   };
 
   const handleEpisodeInputChange = (field, value) => {
-    setEpisodeForm((prev) => ({ ...prev, [field]: value }));
+    if (field in episodeForm.sources) {
+      setEpisodeForm((prev) => ({
+        ...prev,
+        sources: { ...prev.sources, [field]: value },
+      }));
+    } else {
+      setEpisodeForm((prev) => ({ ...prev, [field]: value }));
+    }
     if (formErrors[field]) {
       setFormErrors((prev) => ({ ...prev, [field]: '' }));
     }
@@ -183,10 +211,15 @@ function AdminMovies() {
 
     setIsSubmittingEpisode(true);
     try {
+      const sources = {};
+      Object.entries(episodeForm.sources).forEach(([quality, url]) => {
+        sources[quality] = toEmbedUrl(url.trim());
+      });
+
       const payload = {
         movie_id: episodeModal.movie.id,
         episode_number: Number(episodeForm.episode_number),
-        youtube_url: toEmbedUrl(episodeForm.youtube_url.trim()),
+        sources: sources,
       };
 
       await createAdminEpisode(payload);
@@ -199,7 +232,12 @@ function AdminMovies() {
 
       setEpisodeForm({
         episode_number: String(nextEpisodeNumber),
-        youtube_url: '',
+        sources: {
+          '360p': '',
+          '720p': '',
+          '1080p': '',
+          '4k': '',
+        },
       });
     } catch (err) {
       const apiMessage = err.response?.data?.message || err.message;
@@ -309,7 +347,7 @@ function AdminMovies() {
                       onClick={() => openEpisodeModal(movie)}
                       className="flex-1 px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-black rounded-lg flex items-center gap-2 transition-all shadow-sm shadow-cyan-900/30">
                       <Plus size={14} />
-                      Thêm tập
+                      Thêm Tập (4 Link)
                     </button>
 
                     <button
@@ -351,30 +389,52 @@ function AdminMovies() {
 
             <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
               <form onSubmit={handleSubmitEpisode} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] text-gray-500 font-bold uppercase block mb-1">Episode Number *</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={episodeForm.episode_number}
-                      onChange={(e) => handleEpisodeInputChange('episode_number', e.target.value)}
-                      className={`w-full bg-black border rounded-lg px-3 py-2 text-white text-sm outline-none ${formErrors.episode_number ? 'border-red-500' : 'border-gray-700/50 focus:border-cyan-500'}`}
-                    />
-                    {formErrors.episode_number && <p className="text-red-400 text-xs mt-1">{formErrors.episode_number}</p>}
-                  </div>
+                <div>
+                  <label className="text-[10px] text-gray-500 font-bold uppercase block mb-1">Episode Number *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={episodeForm.episode_number}
+                    onChange={(e) => handleEpisodeInputChange('episode_number', e.target.value)}
+                    className={`w-full bg-black border rounded-lg px-3 py-2 text-white text-sm outline-none ${formErrors.episode_number ? 'border-red-500' : 'border-gray-700/50 focus:border-cyan-500'}`}
+                  />
+                  {formErrors.episode_number && <p className="text-red-400 text-xs mt-1">{formErrors.episode_number}</p>}
+                </div>
 
-                  <div>
-                    <label className="text-[10px] text-gray-500 font-bold uppercase block mb-1">Youtube URL *</label>
-                    <input
-                      type="text"
-                      value={episodeForm.youtube_url}
-                      onChange={(e) => handleEpisodeInputChange('youtube_url', e.target.value)}
-                      placeholder="https://www.youtube.com/watch?v=..."
-                      className={`w-full bg-black border rounded-lg px-3 py-2 text-white text-sm outline-none ${formErrors.youtube_url ? 'border-red-500' : 'border-gray-700/50 focus:border-cyan-500'}`}
-                    />
-                    {formErrors.youtube_url && <p className="text-red-400 text-xs mt-1">{formErrors.youtube_url}</p>}
+                <div className="bg-[#0f172a] border border-cyan-700/30 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-cyan-300 font-bold uppercase">Nguồn Video (PHẢI ĐỦ 4 MỨC)</p>
+                    <span className="text-xs font-bold text-cyan-400">
+                      {Object.values(episodeForm.sources).filter(v => v && v.trim()).length}/4 ✓
+                    </span>
                   </div>
+                  {['360p', '720p', '1080p', '4k'].map((quality) => {
+                    const hasUrl = episodeForm.sources[quality] && episodeForm.sources[quality].trim() !== '';
+                    return (
+                      <div key={quality}>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs text-gray-300">
+                            {quality.toUpperCase()} {quality === '4k' ? '(VIP)' : ''}
+                          </label>
+                          <span className={`text-xs font-bold ${hasUrl ? 'text-green-400' : 'text-red-400'}`}>
+                            {hasUrl ? '✓ OK' : '✗ Thiếu'}
+                          </span>
+                        </div>
+                        <input
+                          type="text"
+                          value={episodeForm.sources[quality]}
+                          onChange={(e) => handleEpisodeInputChange(quality, e.target.value)}
+                          placeholder={`YouTube URL cho ${quality}`}
+                          className={`w-full bg-black border rounded-lg px-3 py-2 text-white text-sm outline-none transition ${
+                            hasUrl
+                              ? 'border-green-500/50 focus:border-green-500'
+                              : 'border-gray-700/50 focus:border-cyan-500'
+                          }`}
+                        />
+                      </div>
+                    );
+                  })}
+                  {formErrors.sources && <p className="text-red-400 text-xs mt-2">{formErrors.sources}</p>}
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">

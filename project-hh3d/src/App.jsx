@@ -6,18 +6,16 @@ import Detail from './pages/Detail';
 import Watch from './pages/Watch';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VipPurchase from './pages/VipPurchase';
+import LoveMovie from './pages/LoveMovie';
+import ViewingHistory from './pages/WiewinghHistory';
 import Dashboard from './pages/Admin/Dashboard';
 import AdminMovies from './pages/Admin/AdminMovies';
 import AddMovie from './pages/Admin/AddMovie';
 import AddEpisode from './pages/Admin/AddEpisode';
 import EpisodeManager from './pages/Admin/EpisodeManager';
 import AdminUsers from './pages/Admin/AdminUsers';
-
-function AdminRoute({ children }) {
-  const user = (() => { try { return JSON.parse(localStorage.getItem('user')); } catch { return null; } })();
-  if (!user || user.role !== 'admin') { window.location.href = '/'; return null; }
-  return children;
-}
+import AdminRoute from './components/AdminRoute';
 
 export default function App() {
   const location = useLocation();
@@ -31,6 +29,10 @@ export default function App() {
         <Route path="/watch/:movieId/:episode" element={<Watch />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/favorites" element={<LoveMovie />} />
+        <Route path="/history" element={<ViewingHistory />} />
+        <Route path="/vip" element={<VipPurchase />} />
+        <Route path="/vip/checkout" element={<VipPurchase />} />
         <Route path="/admin" element={<AdminRoute><Dashboard /></AdminRoute>} />
         <Route path="/admin/movies" element={<AdminRoute><AdminMovies /></AdminRoute>} />
         <Route path="/admin/movies/add" element={<AdminRoute><AddMovie /></AdminRoute>} />

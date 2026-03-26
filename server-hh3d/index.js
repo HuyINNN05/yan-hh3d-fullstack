@@ -11,7 +11,11 @@ const authMiddleware = require('./middleware/authMiddleware');
 const { adminMiddleware } = require('./middleware/authMiddleware');
 
 let hasMovieTotalEpisodesColumn = false;
+let hasUserVipColumns = false;
+let hasEpisodeSourcesTable = false;
 const viewThrottle = new Map();
+const QUALITY_ORDER = ['360p', '720p', '1080p', '4k'];
+const EPISODE_REQUIRED_QUALITIES = ['360p', '720p', '1080p', '4k'];
 
 function slugify(text = '') {
     return String(text)
@@ -78,6 +82,103 @@ function normalizeYoutubeEmbedUrl(input = '') {
     const videoId = extractYoutubeVideoId(input);
     if (!videoId) return null;
     return `https://www.youtube.com/embed/${videoId}`;
+}
+
+function normalizeQuality(input = '') {
+    const raw = String(input || '').trim().toLowerCase();
+    if (raw === '4k' || raw === '2160p') return '4k';
+    if (raw === '1080p' || raw === 'fullhd' || raw === 'fhd') return '1080p';
+    if (raw === '720p' || raw === 'hd') return '720p';
+    if (raw === '360p' || raw === 'sd') return '360p';
+    return '720p';
+}
+
+function isUserVipActive(user = null) {
+    if (!user) return false;
+    if (!user.is_vip) return false;
+    if (!user.vip_expires_at) return true;
+    return new Date(user.vip_expires_at).getTime() > Date.now();
+}
+
+function parseOptionalUserFromRequest(req) {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+    const token = authHeader.split(' ')[1];
+    try {
+        return jwt.verify(token, process.env.JWT_SECRET || 'secret_key');
+    } catch {
+        return null;
+    }
+}
+
+function collectEpisodeSourcesFromBody(body = {}) {
+    const nested = body.sources || {};
+    const sourceMap = {
+        '360p': nested['360p'] || body.video_url_360 || body.video360 || body.url_360,
+        '720p': nested['720p'] || body.video_url_720 || body.video720 || body.video_url,
+        '1080p': nested['1080p'] || body.video_url_1080 || body.video1080 || body.url_1080,
+        '4k': nested['4k'] || nested['2160p'] || body.video_url_4k || body.video4k || body.url_4k,
+    };
+
+    const normalized = {};
+    for (const quality of EPISODE_REQUIRED_QUALITIES) {
+        const parsed = normalizeYoutubeEmbedUrl(sourceMap[quality] || '');
+        if (!parsed) return { ok: false, message: `Nguồn ${quality} không hợp lệ hoặc để trống` };
+        normalized[quality] = parsed;
+    }
+
+    return { ok: true, sources: normalized };
+}
+
+async function loadEpisodeSourcesByMovie(movieId) {
+    if (!hasEpisodeSourcesTable) return new Map();
+    const [rows] = await db.query(
+        `SELECT movie_id, episode_number, quality, video_url, is_vip_only
+         FROM episode_sources
+         WHERE movie_id = ?`,
+        [movieId]
+    );
+
+    const mapping = new Map();
+    for (const row of rows) {
+        const key = Number(row.episode_number);
+        if (!mapping.has(key)) mapping.set(key, []);
+        mapping.get(key).push({
+            quality: normalizeQuality(row.quality),
+            video_url: row.video_url,
+            is_vip_only: Number(row.is_vip_only) === 1,
+        });
+    }
+
+    for (const [ep, items] of mapping.entries()) {
+        items.sort((a, b) => QUALITY_ORDER.indexOf(a.quality) - QUALITY_ORDER.indexOf(b.quality));
+        mapping.set(ep, items);
+    }
+
+    return mapping;
+}
+
+async function listEpisodesWithSources(movieId) {
+    const [episodes] = await db.query(
+        `SELECT * FROM episodes WHERE movie_id = ? ORDER BY CAST(episode_number AS UNSIGNED) ASC`,
+        [movieId]
+    );
+
+    const sourceMap = await loadEpisodeSourcesByMovie(movieId);
+    return episodes.map((ep) => {
+        const episodeNo = Number(ep.episode_number);
+        let sources = sourceMap.get(episodeNo) || [];
+
+        if (sources.length === 0 && ep.video_url) {
+            sources = [{ quality: '720p', video_url: ep.video_url, is_vip_only: false }];
+        }
+
+        return {
+            ...ep,
+            sources,
+            available_qualities: sources.map((s) => s.quality),
+        };
+    });
 }
 
 async function resolveCategoryId(category, categoryId) {
@@ -232,10 +333,7 @@ app.get('/api/search', async (req, res) => {
 app.get('/api/episodes/:movieId', async (req, res) => {
     try {
         const movieId = req.params.movieId;
-        const [data] = await db.query(
-            "SELECT * FROM episodes WHERE movie_id = ? ORDER BY CAST(episode_number AS UNSIGNED) ASC",
-            [movieId]
-        );
+        const data = await listEpisodesWithSources(movieId);
         return res.json(data);
     } catch (err) {
         console.error(err);
@@ -246,14 +344,86 @@ app.get('/api/episodes/:movieId', async (req, res) => {
 app.get('/api/movies/:id/episodes', async (req, res) => {
     try {
         const movieId = req.params.id;
-        const [data] = await db.query(
-            "SELECT * FROM episodes WHERE movie_id = ? ORDER BY CAST(episode_number AS UNSIGNED) ASC",
-            [movieId]
-        );
+        const data = await listEpisodesWithSources(movieId);
         return res.json(data);
     } catch (err) {
         console.error(err);
         return res.status(500).json({ message: "Lỗi lấy tập phim" });
+    }
+});
+
+app.get('/api/movies/:movieId/episodes/:episodeNumber/stream', async (req, res) => {
+    try {
+        const movieId = Number(req.params.movieId);
+        const episodeNumber = Number(req.params.episodeNumber);
+        const requestedQuality = normalizeQuality(req.query.quality || '720p');
+
+        if (!Number.isFinite(movieId) || !Number.isFinite(episodeNumber)) {
+            return res.status(400).json({ message: 'Thông tin tập phim không hợp lệ' });
+        }
+
+        const [episodeRows] = await db.query(
+            'SELECT * FROM episodes WHERE movie_id = ? AND episode_number = ? LIMIT 1',
+            [movieId, episodeNumber]
+        );
+        if (!episodeRows.length) {
+            return res.status(404).json({ message: 'Không tìm thấy tập phim' });
+        }
+
+        const [sourceRows] = hasEpisodeSourcesTable
+            ? await db.query(
+                `SELECT quality, video_url, is_vip_only
+                 FROM episode_sources
+                 WHERE movie_id = ? AND episode_number = ?`,
+                [movieId, episodeNumber]
+            )
+            : [[]];
+
+        const fallbackSource = episodeRows[0].video_url
+            ? [{ quality: '720p', video_url: episodeRows[0].video_url, is_vip_only: 0 }]
+            : [];
+
+        const sources = (sourceRows.length ? sourceRows : fallbackSource)
+            .map((row) => ({
+                quality: normalizeQuality(row.quality),
+                video_url: row.video_url,
+                is_vip_only: Number(row.is_vip_only) === 1,
+            }))
+            .sort((a, b) => QUALITY_ORDER.indexOf(a.quality) - QUALITY_ORDER.indexOf(b.quality));
+
+        if (!sources.length) {
+            return res.status(404).json({ message: 'Tập phim chưa có nguồn phát' });
+        }
+
+        const picked = sources.find((s) => s.quality === requestedQuality) || sources[0];
+        if (!picked) {
+            return res.status(404).json({ message: 'Không có chất lượng video phù hợp' });
+        }
+
+        const optionalUser = parseOptionalUserFromRequest(req);
+        const userVip = isUserVipActive(optionalUser);
+        if (picked.is_vip_only && !userVip) {
+            return res.status(402).json({
+                message: 'Chất lượng 4K chỉ dành cho tài khoản VIP',
+                requires_vip: true,
+                quality: picked.quality,
+            });
+        }
+
+        return res.json({
+            movie_id: movieId,
+            episode_number: episodeNumber,
+            quality: picked.quality,
+            video_url: picked.video_url,
+            requires_vip: Boolean(picked.is_vip_only),
+            available_qualities: sources.map((s) => ({
+                quality: s.quality,
+                requires_vip: Boolean(s.is_vip_only),
+            })),
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Lỗi lấy nguồn phát video' });
     }
 });
 
@@ -345,18 +515,24 @@ app.get('/api/categories', async (req, res) => {
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
+        const identifier = String(email || '').trim();
         
-        if (!email || !password) {
-            return res.status(400).json({ message: "Email và mật khẩu không được để trống" });
+        if (!identifier || !password) {
+            return res.status(400).json({ message: "Email hoặc tên đăng nhập và mật khẩu không được để trống" });
         }
 
         const [rows] = await db.query(
-            "SELECT id, username, email, password AS hashed, role FROM users WHERE email = ?",
-            [email]
+            `SELECT id, username, email, password AS hashed, role,
+                    COALESCE(is_vip, 0) AS is_vip,
+                    vip_expires_at
+             FROM users
+             WHERE LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)
+             LIMIT 1`,
+            [identifier, identifier]
         );
 
         if (rows.length === 0) {
-            return res.status(401).json({ message: "Email không tồn tại" });
+            return res.status(401).json({ message: "Tài khoản không tồn tại" });
         }
 
         const user = rows[0];
@@ -383,6 +559,16 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ message: "Mật khẩu không chính xác" });
         }
 
+        // Auto-upgrade plain text password to bcrypt for better security.
+        if (!isBcryptHash) {
+            try {
+                const secureHash = await bcrypt.hash(password, Number(process.env.BCRYPT_ROUNDS) || 10);
+                await db.query('UPDATE users SET password = ? WHERE id = ?', [secureHash, user.id]);
+            } catch (hashErr) {
+                console.warn('Password upgrade warning:', hashErr.message);
+            }
+        }
+
         // Generate JWT Token
         const token = jwt.sign(
             { id: user.id, email: user.email, role: user.role },
@@ -397,7 +583,9 @@ app.post('/api/login', async (req, res) => {
                 id: user.id, 
                 username: user.username, 
                 email: user.email, 
-                role: user.role 
+                role: user.role,
+                is_vip: Boolean(user.is_vip),
+                vip_expires_at: user.vip_expires_at || null,
             } 
         });
     } catch (err) {
@@ -448,6 +636,83 @@ app.post('/api/register', async (req, res) => {
     } catch (err) {
         console.error("Register error:", err);
         return res.status(500).json({ message: "Lỗi đăng ký" });
+    }
+});
+
+app.get('/api/users/me', authMiddleware, async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            `SELECT id, username, email, role,
+                    COALESCE(is_vip, 0) AS is_vip,
+                    vip_expires_at
+             FROM users
+             WHERE id = ?
+             LIMIT 1`,
+            [req.user.id]
+        );
+
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+        }
+
+        const user = rows[0];
+        return res.json({
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+            is_vip: Boolean(user.is_vip) && isUserVipActive(user),
+            vip_expires_at: user.vip_expires_at || null,
+        });
+    } catch (err) {
+        console.error('Me API error:', err);
+        return res.status(500).json({ message: 'Lỗi lấy thông tin người dùng' });
+    }
+});
+
+app.post('/api/users/me/vip/purchase', authMiddleware, async (req, res) => {
+    try {
+        const months = Number(req.body?.months || 1);
+        if (![1, 3, 12].includes(months)) {
+            return res.status(400).json({ message: 'Gói VIP không hợp lệ. Chỉ hỗ trợ 1, 3 hoặc 12 tháng.' });
+        }
+
+        await db.query(
+            `UPDATE users
+             SET is_vip = 1,
+                 vip_expires_at = CASE
+                     WHEN vip_expires_at IS NULL OR vip_expires_at < NOW() THEN DATE_ADD(NOW(), INTERVAL ? MONTH)
+                     ELSE DATE_ADD(vip_expires_at, INTERVAL ? MONTH)
+                 END
+             WHERE id = ?`,
+            [months, months, req.user.id]
+        );
+
+        const [rows] = await db.query(
+            `SELECT id, username, email, role,
+                    COALESCE(is_vip, 0) AS is_vip,
+                    vip_expires_at
+             FROM users
+             WHERE id = ?
+             LIMIT 1`,
+            [req.user.id]
+        );
+
+        const user = rows[0];
+        return res.json({
+            message: `Nâng cấp VIP ${months} tháng thành công`,
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                is_vip: Boolean(user.is_vip) && isUserVipActive(user),
+                vip_expires_at: user.vip_expires_at || null,
+            }
+        });
+    } catch (err) {
+        console.error('VIP purchase error:', err);
+        return res.status(500).json({ message: 'Lỗi xử lý nâng cấp VIP' });
     }
 });
 
@@ -543,13 +808,7 @@ app.delete('/api/admin/movies/:id', authMiddleware, adminMiddleware, async (req,
 app.get('/api/admin/episodes/:movieId', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const movieId = req.params.movieId;
-        const [data] = await db.query(
-            `SELECT id, movie_id, episode_number, video_url, video_url AS youtube_url, created_at
-             FROM episodes
-             WHERE movie_id = ?
-             ORDER BY CAST(episode_number AS UNSIGNED) ASC`,
-            [movieId]
-        );
+        const data = await listEpisodesWithSources(movieId);
         return res.json(data);
     } catch (err) {
         console.error(err);
@@ -559,21 +818,20 @@ app.get('/api/admin/episodes/:movieId', authMiddleware, adminMiddleware, async (
 
 app.post('/api/admin/episodes', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { movie_id, episode_number, video_url, youtube_url } = req.body;
-        const normalizedVideoInput = (youtube_url || video_url || '').trim();
+        const { movie_id, episode_number } = req.body;
         const normalizedEpisodeNumber = parseInt(episode_number, 10);
-        const normalizedVideoUrl = normalizeYoutubeEmbedUrl(normalizedVideoInput);
+        const sourceResult = collectEpisodeSourcesFromBody(req.body);
         
-        if (!movie_id || !normalizedEpisodeNumber || !normalizedVideoInput) {
-            return res.status(400).json({ message: "Movie ID, Episode số, và Video URL không được để trống" });
+        if (!movie_id || !normalizedEpisodeNumber) {
+            return res.status(400).json({ message: "Movie ID và Episode số không được để trống" });
         }
 
         if (normalizedEpisodeNumber < 1) {
             return res.status(400).json({ message: 'Episode number phải lớn hơn 0' });
         }
 
-        if (!normalizedVideoUrl) {
-            return res.status(400).json({ message: 'Youtube URL không hợp lệ' });
+        if (!sourceResult.ok) {
+            return res.status(400).json({ message: sourceResult.message });
         }
 
         // Kiểm tra số tập không vượt quá tổng số tập của phim
@@ -601,14 +859,38 @@ app.post('/api/admin/episodes', authMiddleware, adminMiddleware, async (req, res
             return res.status(400).json({ message: `Tập ${normalizedEpisodeNumber} đã tồn tại cho phim này` });
         }
 
-        const [result] = await db.query(
-            "INSERT INTO episodes (movie_id, episode_number, video_url) VALUES (?, ?, ?)",
-            [movie_id, normalizedEpisodeNumber, normalizedVideoUrl]
-        );
+        const conn = await db.getConnection();
+        let insertId = null;
+        try {
+            await conn.beginTransaction();
+            const [result] = await conn.query(
+                "INSERT INTO episodes (movie_id, episode_number, video_url) VALUES (?, ?, ?)",
+                [movie_id, normalizedEpisodeNumber, sourceResult.sources['720p']]
+            );
+            insertId = result.insertId;
+
+            await conn.query(
+                `INSERT INTO episode_sources (movie_id, episode_number, quality, video_url, is_vip_only)
+                 VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)`,
+                [
+                    movie_id, normalizedEpisodeNumber, '360p', sourceResult.sources['360p'], 0,
+                    movie_id, normalizedEpisodeNumber, '720p', sourceResult.sources['720p'], 0,
+                    movie_id, normalizedEpisodeNumber, '1080p', sourceResult.sources['1080p'], 0,
+                    movie_id, normalizedEpisodeNumber, '4k', sourceResult.sources['4k'], 1,
+                ]
+            );
+
+            await conn.commit();
+        } catch (txErr) {
+            await conn.rollback();
+            throw txErr;
+        } finally {
+            conn.release();
+        }
 
         return res.status(201).json({ 
             message: "Thêm tập phim thành công!", 
-            id: result.insertId 
+            id: insertId 
         });
     } catch (err) {
         console.error("Error adding episode:", err);
@@ -619,21 +901,20 @@ app.post('/api/admin/episodes', authMiddleware, adminMiddleware, async (req, res
 app.put('/api/admin/episodes/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const id = req.params.id;
-        const { movie_id, episode_number, video_url, youtube_url } = req.body;
-        const normalizedVideoInput = (youtube_url || video_url || '').trim();
+        const { movie_id, episode_number } = req.body;
         const normalizedEpisodeNumber = parseInt(episode_number, 10);
-        const normalizedVideoUrl = normalizeYoutubeEmbedUrl(normalizedVideoInput);
+        const sourceResult = collectEpisodeSourcesFromBody(req.body);
         
-        if (!normalizedEpisodeNumber || !normalizedVideoInput) {
-            return res.status(400).json({ message: "Episode số và Video URL không được để trống" });
+        if (!normalizedEpisodeNumber) {
+            return res.status(400).json({ message: "Episode số không được để trống" });
         }
 
-        if (!normalizedVideoUrl) {
-            return res.status(400).json({ message: 'Youtube URL không hợp lệ' });
+        if (!sourceResult.ok) {
+            return res.status(400).json({ message: sourceResult.message });
         }
 
         // Lấy thông tin tập cũ để so sánh
-        const [oldEpisode] = await db.query("SELECT movie_id FROM episodes WHERE id = ?", [id]);
+        const [oldEpisode] = await db.query("SELECT movie_id, episode_number FROM episodes WHERE id = ?", [id]);
         if (!oldEpisode.length) {
             return res.status(404).json({ message: "Tập phim không tồn tại" });
         }
@@ -659,10 +940,38 @@ app.put('/api/admin/episodes/:id', authMiddleware, adminMiddleware, async (req, 
             return res.status(400).json({ message: `Tập ${normalizedEpisodeNumber} đã tồn tại cho phim này` });
         }
 
-        await db.query(
-            "UPDATE episodes SET episode_number=?, video_url=? WHERE id=?",
-            [normalizedEpisodeNumber, normalizedVideoUrl, id]
-        );
+        const conn = await db.getConnection();
+        try {
+            await conn.beginTransaction();
+            await conn.query(
+                "UPDATE episodes SET episode_number=?, video_url=? WHERE id=?",
+                [normalizedEpisodeNumber, sourceResult.sources['720p'], id]
+            );
+
+            await conn.query(
+                `DELETE FROM episode_sources
+                 WHERE movie_id = ? AND episode_number = ?`,
+                [movieIdToCheck, oldEpisode[0].episode_number]
+            );
+
+            await conn.query(
+                `INSERT INTO episode_sources (movie_id, episode_number, quality, video_url, is_vip_only)
+                 VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)`,
+                [
+                    movieIdToCheck, normalizedEpisodeNumber, '360p', sourceResult.sources['360p'], 0,
+                    movieIdToCheck, normalizedEpisodeNumber, '720p', sourceResult.sources['720p'], 0,
+                    movieIdToCheck, normalizedEpisodeNumber, '1080p', sourceResult.sources['1080p'], 0,
+                    movieIdToCheck, normalizedEpisodeNumber, '4k', sourceResult.sources['4k'], 1,
+                ]
+            );
+
+            await conn.commit();
+        } catch (txErr) {
+            await conn.rollback();
+            throw txErr;
+        } finally {
+            conn.release();
+        }
 
         return res.json({ message: "Cập nhật tập phim thành công!" });
     } catch (err) {
@@ -674,6 +983,13 @@ app.put('/api/admin/episodes/:id', authMiddleware, adminMiddleware, async (req, 
 app.delete('/api/admin/episodes/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const id = req.params.id;
+        const [episodeRows] = await db.query('SELECT movie_id, episode_number FROM episodes WHERE id = ? LIMIT 1', [id]);
+        if (episodeRows.length > 0) {
+            await db.query(
+                'DELETE FROM episode_sources WHERE movie_id = ? AND episode_number = ?',
+                [episodeRows[0].movie_id, episodeRows[0].episode_number]
+            );
+        }
         await db.query("DELETE FROM episodes WHERE id = ?", [id]);
         return res.json({ message: "Đã xóa tập phim!" });
     } catch (err) {
@@ -685,7 +1001,7 @@ app.delete('/api/admin/episodes/:id', authMiddleware, adminMiddleware, async (re
 app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const [data] = await db.query(
-            "SELECT id, username, email, role, created_at FROM users ORDER BY id DESC"
+            "SELECT id, username, email, role, created_at, COALESCE(is_vip, 0) AS is_vip, vip_expires_at FROM users ORDER BY id DESC"
         );
         return res.json(data);
     } catch (err) {
@@ -978,6 +1294,184 @@ app.post('/api/movies/:movieId/ratings', authMiddleware, async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// FAVORITES MANAGEMENT (Yêu thích)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// GET user's favorites
+app.get('/api/users/me/favorites', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const [favorites] = await db.query(
+            `SELECT movies.* FROM movies 
+             INNER JOIN favorites ON movies.id = favorites.movie_id 
+             WHERE favorites.user_id = ? 
+             ORDER BY favorites.created_at DESC`,
+            [userId]
+        );
+        res.json(favorites.map(normalizeMovie));
+    } catch (err) {
+        console.error('Lỗi lấy danh sách yêu thích:', err);
+        res.status(500).json({ message: 'Lỗi lấy danh sách yêu thích' });
+    }
+});
+
+// ADD to favorites
+app.post('/api/users/me/favorites', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { movieId } = req.body;
+
+        if (!movieId) {
+            return res.status(400).json({ message: 'Cần cung cấp movieId' });
+        }
+
+        // Kiểm tra phim tồn tại
+        const [movie] = await db.query('SELECT id FROM movies WHERE id = ?', [movieId]);
+        if (!movie.length) {
+            return res.status(404).json({ message: 'Phim không tồn tại' });
+        }
+
+        // Kiểm tra đã like chưa
+        const [existing] = await db.query(
+            'SELECT 1 FROM favorites WHERE user_id = ? AND movie_id = ?',
+            [userId, movieId]
+        );
+
+        if (existing.length > 0) {
+            return res.status(400).json({ message: 'Phim đã có trong danh sách yêu thích' });
+        }
+
+        // Thêm vào favorites
+        const [result] = await db.query(
+            'INSERT INTO favorites (user_id, movie_id) VALUES (?, ?)',
+            [userId, movieId]
+        );
+
+        res.status(201).json({ message: 'Đã thêm vào danh sách yêu thích', id: result.insertId });
+    } catch (err) {
+        console.error('Lỗi thêm yêu thích:', err);
+        res.status(500).json({ message: 'Lỗi thêm vào danh sách yêu thích' });
+    }
+});
+
+// REMOVE from favorites
+app.delete('/api/users/me/favorites/:movieId', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { movieId } = req.params;
+
+        const [result] = await db.query(
+            'DELETE FROM favorites WHERE user_id = ? AND movie_id = ?',
+            [userId, movieId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Phim không có trong danh sách yêu thích' });
+        }
+
+        res.json({ message: 'Đã xóa khỏi danh sách yêu thích' });
+    } catch (err) {
+        console.error('Lỗi xóa yêu thích:', err);
+        res.status(500).json({ message: 'Lỗi xóa khỏi danh sách yêu thích' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WATCH HISTORY MANAGEMENT (Lịch sử xem)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// GET user's watch history
+app.get('/api/users/me/history', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const [history] = await db.query(
+            `SELECT movies.*, watch_history.id as history_id, watch_history.watched_at, watch_history.episode_id
+             FROM movies
+             INNER JOIN watch_history ON movies.id = watch_history.movie_id
+             WHERE watch_history.user_id = ?
+             ORDER BY watch_history.watched_at DESC
+             LIMIT 100`,
+            [userId]
+        );
+        res.json(history.map(item => ({
+            ...normalizeMovie(item),
+            history_id: item.history_id,
+            watched_at: item.watched_at,
+            episode_id: item.episode_id
+        })));
+    } catch (err) {
+        console.error('Lỗi lấy lịch sử xem:', err);
+        res.status(500).json({ message: 'Lỗi lấy lịch sử xem' });
+    }
+});
+
+// ADD to watch history
+app.post('/api/users/me/history', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { movieId, episodeId } = req.body;
+
+        if (!movieId) {
+            return res.status(400).json({ message: 'Cần cung cấp movieId' });
+        }
+
+        // Kiểm tra phim tồn tại
+        const [movie] = await db.query('SELECT id FROM movies WHERE id = ?', [movieId]);
+        if (!movie.length) {
+            return res.status(404).json({ message: 'Phim không tồn tại' });
+        }
+
+        // Thêm vào watch history (allow duplicates, but update existed timestamp)
+        const [existing] = await db.query(
+            'SELECT id FROM watch_history WHERE user_id = ? AND movie_id = ?',
+            [userId, movieId]
+        );
+
+        if (existing.length > 0) {
+            // Update watched_at
+            const [result] = await db.query(
+                'UPDATE watch_history SET watched_at = NOW(), episode_id = ? WHERE user_id = ? AND movie_id = ?',
+                [episodeId || null, userId, movieId]
+            );
+            return res.json({ message: 'Cập nhật lịch sử xem', id: existing[0].id });
+        }
+
+        // Insert new
+        const [result] = await db.query(
+            'INSERT INTO watch_history (user_id, movie_id, episode_id) VALUES (?, ?, ?)',
+            [userId, movieId, episodeId || null]
+        );
+
+        res.status(201).json({ message: 'Đã thêm vào lịch sử xem', id: result.insertId });
+    } catch (err) {
+        console.error('Lỗi thêm lịch sử xem:', err);
+        res.status(500).json({ message: 'Lỗi thêm lịch sử xem' });
+    }
+});
+
+// REMOVE from watch history
+app.delete('/api/users/me/history/:movieId', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { movieId } = req.params;
+
+        const [result] = await db.query(
+            'DELETE FROM watch_history WHERE user_id = ? AND movie_id = ?',
+            [userId, movieId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Không tìm thấy trong lịch sử xem' });
+        }
+
+        res.json({ message: 'Đã xóa khỏi lịch sử xem' });
+    } catch (err) {
+        console.error('Lỗi xóa lịch sử xem:', err);
+        res.status(500).json({ message: 'Lỗi xóa lịch sử xem' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // 404 & ERROR HANDLING
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1019,16 +1513,84 @@ async function detectSchemaFlags() {
         );
         hasMovieTotalEpisodesColumn = totalEpisodesCol.length > 0;
 
-        console.log(`Schema flags: movies.total_episodes=${hasMovieTotalEpisodesColumn}`);
+        const [vipCols] = await db.query(
+            `SELECT COLUMN_NAME
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'users'
+               AND COLUMN_NAME IN ('is_vip', 'vip_expires_at')`
+        );
+        hasUserVipColumns = vipCols.length === 2;
+
+        const [episodeSourceTable] = await db.query(
+            "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'episode_sources' LIMIT 1"
+        );
+        hasEpisodeSourcesTable = episodeSourceTable.length > 0;
+
+        console.log(
+            `Schema flags: movies.total_episodes=${hasMovieTotalEpisodesColumn}, users.vip=${hasUserVipColumns}, episode_sources=${hasEpisodeSourcesTable}`
+        );
     } catch (err) {
         console.warn('⚠️ Không thể đọc schema flags:', err.message);
     }
 }
 
+async function ensureVipAndQualitySchema() {
+    try {
+        const [vipFlagColumn] = await db.query(
+            "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'is_vip' LIMIT 1"
+        );
+        if (!vipFlagColumn.length) {
+            await db.query("ALTER TABLE users ADD COLUMN is_vip TINYINT(1) NOT NULL DEFAULT 0");
+        }
+
+        const [vipExpiryColumn] = await db.query(
+            "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'vip_expires_at' LIMIT 1"
+        );
+        if (!vipExpiryColumn.length) {
+            await db.query("ALTER TABLE users ADD COLUMN vip_expires_at DATETIME NULL");
+        }
+
+        await db.query(
+            `CREATE TABLE IF NOT EXISTS episode_sources (
+                id INT NOT NULL AUTO_INCREMENT,
+                movie_id INT NOT NULL,
+                episode_number INT NOT NULL,
+                quality VARCHAR(10) NOT NULL,
+                video_url VARCHAR(500) NOT NULL,
+                is_vip_only TINYINT(1) NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY uniq_episode_quality (movie_id, episode_number, quality),
+                KEY idx_episode_sources_movie_episode (movie_id, episode_number),
+                CONSTRAINT fk_episode_sources_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+        );
+
+        // Backfill 720p source from legacy episodes.video_url for old data.
+        await db.query(
+            `INSERT INTO episode_sources (movie_id, episode_number, quality, video_url, is_vip_only)
+             SELECT e.movie_id, e.episode_number, '720p', e.video_url, 0
+             FROM episodes e
+             LEFT JOIN episode_sources s
+               ON s.movie_id = e.movie_id AND s.episode_number = e.episode_number AND s.quality = '720p'
+             WHERE s.id IS NULL AND e.video_url IS NOT NULL AND e.video_url <> ''`
+        );
+    } catch (err) {
+        console.warn('⚠️ Không thể bootstrap schema VIP/quality:', err.message);
+    }
+}
+
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, async () => {
+let server;
+
+async function startServer() {
+    await ensureVipAndQualitySchema();
     await detectSchemaFlags();
-    console.log(`
+
+    server = app.listen(PORT, () => {
+        console.log(`
 ╔════════════════════════════════════════════════════════════════╗
 ║  🎬 YanHH3D Server - Online                                    ║
 ║  PORT: ${PORT}                                                   ║
@@ -1036,6 +1598,12 @@ const server = app.listen(PORT, async () => {
 ║  URL: http://localhost:${PORT}                                 ║
 ╚════════════════════════════════════════════════════════════════╝
     `);
+    });
+}
+
+startServer().catch((err) => {
+    console.error('❌ Không thể khởi động server:', err);
+    process.exit(1);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

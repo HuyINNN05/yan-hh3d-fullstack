@@ -1,27 +1,78 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Trash2, History, PlayCircle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { getWatchHistory, removeFromWatchHistory, getLocalWatchHistory, setLocalWatchHistory } from '../api/userLibraryApi';
 
 function ViewingHistory() {
     const [history, setHistory] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const { user } = useAuth();
 
+    // Load history từ API (nếu user đăng nhập) hoặc localStorage (guest)
     useEffect(() => {
-        const data = JSON.parse(localStorage.getItem('viewing_history')) || [];
-        setHistory(data);
-    }, []);
+        const loadHistory = async () => {
+            try {
+                setLoading(true);
+                if (user) {
+                    // User đăng nhập: lấy từ backend
+                    const data = await getWatchHistory();
+                    setHistory(data);
+                } else {
+                    // Guest: lấy từ localStorage
+                    const data = getLocalWatchHistory();
+                    setHistory(data);
+                }
+            } catch (error) {
+                console.error('Lỗi load history:', error);
+                setHistory([]);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const removeHistory = (id) => {
-        const updated = history.filter(m => m.id !== id);
-        localStorage.setItem('viewing_history', JSON.stringify(updated));
-        setHistory(updated);
-    };
+        loadHistory();
+    }, [user]);
 
-    const clearAll = () => {
-        if (window.confirm("Xóa toàn bộ lịch sử xem?")) {
-            localStorage.removeItem('viewing_history');
-            setHistory([]);
+    const removeHistory = async (id) => {
+        try {
+            if (user) {
+                // User đăng nhập: gọi API xóa
+                await removeFromWatchHistory(id);
+                setHistory(history.filter(m => m.id !== id));
+            } else {
+                // Guest: xóa từ localStorage
+                const updated = history.filter(m => m.id !== id);
+                setLocalWatchHistory(updated);
+                setHistory(updated);
+            }
+        } catch (error) {
+            console.error('Lỗi xóa history:', error);
         }
     };
+
+    const clearAll = async () => {
+        if (window.confirm("Xóa toàn bộ lịch sử xem?")) {
+            try {
+                if (user) {
+                    // Gọi xóa hết từng cái (hoặc có thể tạo endpoint xóa tất cả)
+                    for (const movie of history) {
+                        await removeFromWatchHistory(movie.id);
+                    }
+                } else {
+                    // Xóa localStorage
+                    localStorage.removeItem('viewing_history');
+                }
+                setHistory([]);
+            } catch (error) {
+                console.error('Lỗi xóa tất cả:', error);
+            }
+        }
+    };
+
+    if (loading) {
+        return <div className="bg-[#0f0f0f] min-h-screen text-white pt-24 flex items-center justify-center">Đang tải...</div>;
+    }
 
     return (
         <div className="bg-[#0f0f0f] min-h-screen text-white pt-24 pb-10">
@@ -42,7 +93,7 @@ function ViewingHistory() {
                         {history.map((movie) => (
                             <div key={movie.id} className="group relative bg-[#161616] rounded-xl overflow-hidden border border-gray-800">
                                 <Link to={`/movie/${movie.id}`} className="block aspect-[2/3] relative">
-                                    <img src={movie.image} className="w-full h-full object-cover" alt={movie.title} />
+                                    <img src={movie.image || movie.poster} className="w-full h-full object-cover" alt={movie.title} />
                                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                         <PlayCircle size={40} className="text-cyan-400" />
                                     </div>

@@ -18,4 +18,4 @@ export const login = (data) =>
  * Lấy thông tin user hiện tại (cần token)
  */
 export const getMe = () =>
-    axiosInstance.get('/auth/me');
+    axiosInstance.get('/users/me');

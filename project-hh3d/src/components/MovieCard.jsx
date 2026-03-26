@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye } from 'lucide-react';
+import { Eye, Heart } from 'lucide-react';
+import { addFavorite, removeFavorite, getLocalFavorites, setLocalFavorites } from '../api/userLibraryApi';
 
 // Image pode ser URL completa ou path relativa /image/xxx.jpg
 // Se for URL externa (http/https), usar rota proxy para evitar CORS
@@ -20,6 +21,47 @@ function getImageUrl(image) {
 export default function MovieCard({ movie }) {
   const { id, title, image, poster, quality, status, views, total_episodes } = movie;
   const imgSrc = getImageUrl(poster || image);
+  const [isFav, setIsFav] = useState(false);
+
+  useEffect(() => {
+    const localFavs = getLocalFavorites();
+    setIsFav(localFavs.some((item) => Number(item.id) === Number(id)));
+  }, [id]);
+
+  const toggleFavorite = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const hasToken = Boolean(localStorage.getItem('token'));
+    const currentUser = (() => {
+      try { return JSON.parse(localStorage.getItem('user')); } catch { return null; }
+    })();
+
+    try {
+      if (hasToken && currentUser) {
+        if (isFav) {
+          await removeFavorite(id);
+          setIsFav(false);
+        } else {
+          await addFavorite(id);
+          setIsFav(true);
+        }
+      } else {
+        const localFavs = getLocalFavorites();
+        if (isFav) {
+          const updated = localFavs.filter((item) => Number(item.id) !== Number(id));
+          setLocalFavorites(updated);
+          setIsFav(false);
+        } else {
+          const updated = [...localFavs, movie];
+          setLocalFavorites(updated);
+          setIsFav(true);
+        }
+      }
+    } catch (err) {
+      console.error('Loi cap nhat yeu thich:', err);
+    }
+  };
 
   return (
     <Link to={`/movie/${id}`} className="group relative block bg-[#111827] rounded-xl overflow-hidden border border-transparent hover:border-orange-500/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-orange-900/20">
@@ -54,6 +96,19 @@ export default function MovieCard({ movie }) {
             FULL
           </span>
         )}
+
+        <button
+          type="button"
+          onClick={toggleFavorite}
+          className={`absolute bottom-2 right-2 w-8 h-8 rounded-full border flex items-center justify-center transition ${
+            isFav
+              ? 'bg-pink-500 border-pink-500 text-white'
+              : 'bg-black/60 border-white/20 text-gray-200 hover:border-pink-400 hover:text-pink-300'
+          }`}
+          title={isFav ? 'Bo yeu thich' : 'Them vao yeu thich'}
+        >
+          <Heart size={14} fill={isFav ? 'currentColor' : 'none'} />
+        </button>
       </div>
 
       {/* Info */}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Search, History, Bookmark, User, LogOut } from 'lucide-react'; 
+import { Search, History, Bookmark, User, LogOut, Gem } from 'lucide-react'; 
 
 function Header({ onOpenMenu }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -18,12 +18,24 @@ function Header({ onOpenMenu }) {
     if (user) {
       setUserData(user);
     }
+
+    const handleUserUpdated = (event) => {
+      const nextUser = event?.detail?.user;
+      if (nextUser) setUserData(nextUser);
+    };
+
+    window.addEventListener('auth:user-updated', handleUserUpdated);
+    return () => window.removeEventListener('auth:user-updated', handleUserUpdated);
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('user');
     setUserData(null);
     navigate('/');
+  };
+
+  const handleBuyVip = () => {
+    navigate('/vip/checkout');
   };
 
   // Logic tìm kiếm
@@ -136,6 +148,23 @@ function Header({ onOpenMenu }) {
               <span className="text-[9px] font-black uppercase tracking-tighter">Phim yêu thích</span>
           </Link>
           
+          {userData ? (
+            <div className="flex items-center gap-2">
+              {userData?.is_vip ? (
+                <span className="flex items-center gap-1 bg-emerald-500/20 text-emerald-300 px-3 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-wide border border-emerald-500/40">
+                  <Gem size={12} /> VIP
+                </span>
+              ) : (
+                <button
+                  onClick={handleBuyVip}
+                  className="flex items-center gap-1 bg-yellow-500 hover:bg-yellow-400 text-black px-3 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-wide transition-all"
+                >
+                  <Gem size={12} /> Mua VIP
+                </button>
+              )}
+            </div>
+          ) : null}
+
           {userData ? (
             <div className="flex items-center gap-3 bg-[#222] p-1 pr-3 rounded-sm border border-gray-700 group">
               <div className="w-7 h-7 bg-[#26c6da] rounded-sm flex items-center justify-center text-white font-black text-xs">

@@ -25,17 +25,20 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401 || error.response?.status === 403) {
+        const status = error.response?.status;
+        const requestPath = error.config?.url || '';
+        const hasToken = Boolean(localStorage.getItem('token'));
+        const isAuthRequest = requestPath.includes('/login') || requestPath.includes('/register');
+
+        if ((status === 401 || status === 403) && hasToken && !isAuthRequest) {
             // Token hết hạn hoặc không hợp lệ → xóa token và redirect login
             console.warn('Token không hợp lệ hoặc hết hạn');
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             localStorage.removeItem('liked_movies');
-            
-            // Redirect to login page if not already there
-            if (window.location.pathname !== '/login') {
-                window.location.href = '/login';
-            }
+
+            // Notify app to logout gracefully via React Router instead of hard navigation.
+            window.dispatchEvent(new Event('auth:logout'));
         }
         
         // Log error for debugging

@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { Mail, Lock, LogIn, Film, Eye, EyeOff } from 'lucide-react';
-
-const API = import.meta.env.VITE_API_URL || '';
+import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -19,7 +18,12 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.email || !form.password) { 
+    const normalizedForm = {
+      email: form.email.trim(),
+      password: form.password,
+    };
+
+    if (!normalizedForm.email || !normalizedForm.password) { 
       setError('Vui lòng điền đầy đủ thông tin.'); 
       return; 
     }
@@ -28,24 +32,16 @@ export default function Login() {
     setError('');
     
     try {
-      const res = await axios.post(`${API}/api/login`, form);
-      
-      if (res.data?.token && res.data?.user) {
-        // Save token and user info
-        localStorage.setItem('token', res.data.token);
-        localStorage.setItem('user', JSON.stringify(res.data.user));
-        
-        // Check if there's a return URL
-        const returnTo = localStorage.getItem('returnTo');
-        if (returnTo && returnTo !== '/login') {
-          localStorage.removeItem('returnTo');
-          navigate(returnTo);
-        } else {
-          // Redirect based on role
-          navigate(res.data.user.role === 'admin' ? '/admin' : '/');
-        }
+      const loggedInUser = await login(normalizedForm.email, normalizedForm.password);
+
+      // Check if there's a return URL
+      const returnTo = localStorage.getItem('returnTo');
+      if (returnTo && returnTo !== '/login') {
+        localStorage.removeItem('returnTo');
+        navigate(returnTo);
       } else {
-        setError(res.data?.message || 'Đăng nhập thất bại.');
+        // Redirect based on role
+        navigate(loggedInUser?.role === 'admin' ? '/admin' : '/');
       }
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || 'Sai email hoặc mật khẩu!';

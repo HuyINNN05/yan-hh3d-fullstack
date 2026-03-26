@@ -25,7 +25,7 @@ function AddMovie() {
     const file = e.target.files[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) { alert('Vui lòng chọn file ảnh!'); return; }
-    if (file.size > 10 * 1024 * 1024) { alert('Ảnh quá lớn! Tối đa 10MB.'); return; }
+    if (file.size > 10 * 1024 * 1024) { alert('Ảnh quá lớn!'); return; }
 
     setImagePreview(URL.createObjectURL(file));
     setUploadStatus('uploading');
@@ -114,7 +114,7 @@ function AddMovie() {
 
               <input type="file" accept="image/*" className="hidden" id="upload-poster" onChange={handleFileChange} />
               <label htmlFor="upload-poster" className="w-full mt-5 bg-cyan-600 text-black py-4 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase cursor-pointer hover:bg-cyan-500 transition-colors">
-                <Upload size={14} /> Chọn ảnh từ máy (tối đa 10MB)
+                <Upload size={14} /> Chọn ảnh từ máy
               </label>
 
               <div className="mt-3">

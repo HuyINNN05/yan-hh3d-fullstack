@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Menu, X, ChevronDown, Film, LogIn, LogOut, LayoutDashboard } from 'lucide-react';
+import { Search, Menu, X, ChevronDown, Film, LogIn, LogOut, LayoutDashboard, Gem, Heart, History } from 'lucide-react';
 
 const CATEGORIES = [
   { id: 1, name: 'Huyễn Huyễn' },
@@ -51,9 +51,14 @@ export default function Navbar() {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('token');
     localStorage.removeItem('user');
+    window.dispatchEvent(new Event('auth:logout'));
     navigate('/');
-    window.location.reload();
+  };
+
+  const handleBuyVip = () => {
+    navigate('/vip/checkout');
   };
 
   return (
@@ -120,6 +125,24 @@ export default function Navbar() {
 
           {user ? (
             <div className="hidden md:flex items-center gap-1">
+              <Link to="/history" className="flex items-center gap-1 text-xs text-gray-300 hover:text-cyan-300 px-2.5 py-1.5 hover:bg-white/5 rounded-lg transition-all">
+                <History size={14} /> Lich su xem
+              </Link>
+              <Link to="/favorites" className="flex items-center gap-1 text-xs text-gray-300 hover:text-pink-300 px-2.5 py-1.5 hover:bg-white/5 rounded-lg transition-all">
+                <Heart size={14} /> Yeu thich
+              </Link>
+              {user?.is_vip ? (
+                <span className="flex items-center gap-1 text-xs text-emerald-300 px-2.5 py-1.5 bg-emerald-500/15 border border-emerald-500/40 rounded-lg">
+                  <Gem size={14} /> VIP
+                </span>
+              ) : (
+                <button
+                  onClick={handleBuyVip}
+                  className="flex items-center gap-1 text-xs text-yellow-300 hover:text-yellow-200 px-2.5 py-1.5 bg-yellow-500/15 border border-yellow-500/40 rounded-lg transition-all"
+                >
+                  <Gem size={14} /> Mua VIP
+                </button>
+              )}
               {user.role === 'admin' && (
                 <Link to="/admin" className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 px-2.5 py-1.5 hover:bg-white/5 rounded-lg transition-all">
                   <LayoutDashboard size={14} /> Admin
@@ -166,6 +189,24 @@ export default function Navbar() {
           <div className="pt-2 border-t border-gray-800/60">
             {user ? (
               <>
+                <Link to="/history" className="flex items-center gap-2 px-3 py-2.5 text-sm text-cyan-300 hover:bg-white/5 rounded-lg mb-1">
+                  <History size={16} /> Lich su xem
+                </Link>
+                <Link to="/favorites" className="flex items-center gap-2 px-3 py-2.5 text-sm text-pink-300 hover:bg-white/5 rounded-lg mb-1">
+                  <Heart size={16} /> Phim yeu thich
+                </Link>
+                {user?.is_vip ? (
+                  <span className="flex items-center gap-2 px-3 py-2.5 text-sm text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-lg mb-1">
+                    <Gem size={16} /> Tài khoản VIP
+                  </span>
+                ) : (
+                  <button
+                    onClick={handleBuyVip}
+                    className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-yellow-300 bg-yellow-500/10 border border-yellow-500/30 rounded-lg mb-1"
+                  >
+                    <Gem size={16} /> Mua VIP ngay
+                  </button>
+                )}
                 {user.role === 'admin' && (
                   <Link to="/admin" className="flex items-center gap-2 px-3 py-2.5 text-sm text-orange-400 hover:bg-white/5 rounded-lg">
                     <LayoutDashboard size={16} /> Admin Panel
