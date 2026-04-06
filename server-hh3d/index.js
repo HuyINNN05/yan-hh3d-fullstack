@@ -100,12 +100,40 @@ function isUserVipActive(user = null) {
     return new Date(user.vip_expires_at).getTime() > Date.now();
 }
 
-function parseOptionalUserFromRequest(req) {
+function canAccessVipSource(user = null) {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    return isUserVipActive(user);
+}
+
+async function parseOptionalUserFromRequest(req) {
     const authHeader = req.headers['authorization'];
     if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
     const token = authHeader.split(' ')[1];
+
     try {
-        return jwt.verify(token, process.env.JWT_SECRET || 'secret_key');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_key');
+        const userId = Number(decoded?.id);
+        if (!Number.isFinite(userId) || userId <= 0) return null;
+
+        if (!hasUserVipColumns) {
+            return {
+                id: userId,
+                is_vip: false,
+                vip_expires_at: null,
+            };
+        }
+
+        const [rows] = await db.query(
+            `SELECT id, role, COALESCE(is_vip, 0) AS is_vip, vip_expires_at
+             FROM users
+             WHERE id = ?
+             LIMIT 1`,
+            [userId]
+        );
+
+        if (!rows.length) return null;
+        return rows[0];
     } catch {
         return null;
     }
@@ -400,9 +428,9 @@ app.get('/api/movies/:movieId/episodes/:episodeNumber/stream', async (req, res) 
             return res.status(404).json({ message: 'Không có chất lượng video phù hợp' });
         }
 
-        const optionalUser = parseOptionalUserFromRequest(req);
-        const userVip = isUserVipActive(optionalUser);
-        if (picked.is_vip_only && !userVip) {
+        const optionalUser = await parseOptionalUserFromRequest(req);
+        const userCanAccessVip = canAccessVipSource(optionalUser);
+        if (picked.is_vip_only && !userCanAccessVip) {
             return res.status(402).json({
                 message: 'Chất lượng 4K chỉ dành cho tài khoản VIP',
                 requires_vip: true,
@@ -1092,6 +1120,27 @@ app.post('/api/comments', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 // HEALTH CHECK
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// ROOT ENDPOINT
+// ═══════════════════════════════════════════════════════════════════════════
+app.get('/', (req, res) => {
+    res.json({
+        message: '🎬 YanHH3D Backend API',
+        version: '1.0.0',
+        status: 'online',
+        endpoints: {
+            health: '/health',
+            movies: '/api/movies',
+            search: '/api/search',
+            login: '/api/login',
+            register: '/api/register',
+            admin: '/api/admin/movies',
+            documentation: 'See README.md'
+        },
+        timestamp: new Date().toISOString()
+    });
+});
+
 app.get('/health', async (req, res) => {
     try {
         await db.query('SELECT 1');
